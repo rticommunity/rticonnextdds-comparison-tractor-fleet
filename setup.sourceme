@@ -10,19 +10,13 @@
 # Environment variables you can override:
 #   PYTHON         – Python interpreter (default: python3)
 #   VENV_DIR       – venv directory name (default: venv)
+#   NDDSHOME       – RTI Connext DDS installation directory (auto-detected if not set)
 #   RTI_PYTHON_DIR – RTI Connext Python API wheel directory
-#                    (default: /Applications/rti_connext_dds-7.7.0/resource/python_api)
+#                    (default: $NDDSHOME/resource/python_api)
 
-# Save shell options and restore them on exit so that set -e does not kill
-# an interactive shell when this file is sourced.
-if [[ -n "${ZSH_VERSION-}" ]]; then
-  _saved_opts=$(setopt); _restore_opts() { emulate -LR zsh; eval "$_saved_opts" 2>/dev/null; unset _saved_opts; unfunction _restore_opts 2>/dev/null; }
-else
-  _saved_opts=$(set +o); _restore_opts() { eval "$_saved_opts"; unset _saved_opts; unset -f _restore_opts 2>/dev/null; }
-fi
-trap '_restore_opts' RETURN 2>/dev/null || true
-
-set -euo pipefail
+# This file is sourced, not executed. Never use set -e/-u/-o pipefail at the
+# top level — those options propagate to the interactive shell and cause it to
+# exit on any error. We use explicit error checking instead.
 
 # Find repo root as the directory containing this file (works in bash and zsh)
 if [ -n "${BASH_SOURCE[0]+x}" ]; then
@@ -46,6 +40,22 @@ fi
 
 PYTHON="${PYTHON:-python3}"
 VENV_DIR="${VENV_DIR:-venv}"
+
+# ── Locate RTI Connext DDS installation ──────────────────────────────────
+# Auto-detect NDDSHOME if not set. Exported so demo_start.sh scripts inherit it.
+if [ -z "${NDDSHOME:-}" ]; then
+  # Use find to avoid zsh glob errors when a directory pattern has no matches
+  while IFS= read -r d; do
+    [ -d "$d/bin" ] && NDDSHOME="$d"   # picks the last (newest) match
+  done < <(find /Applications /opt "$HOME" -maxdepth 1 -name 'rti_connext_dds-*' -type d 2>/dev/null | sort)
+  if [ -n "${NDDSHOME:-}" ]; then
+    echo "NOTE: NDDSHOME was not set — auto-detected $NDDSHOME"
+  fi
+fi
+if [ -n "${NDDSHOME:-}" ]; then
+  export NDDSHOME
+fi
+# ─────────────────────────────────────────────────────────────────────────
 
 # Require Python >= 3.14.3
 PY_VERSION=$($PYTHON -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")')
@@ -104,18 +114,21 @@ if grep -rq 'rti\.connext' "$REQS_FILE" "$REPO_ROOT"/requirements/*.txt 2>/dev/n
   fi
 
   if [ "$NEEDS_RTI" = true ]; then
-    RTI_PYTHON_DIR="${RTI_PYTHON_DIR:-/Applications/rti_connext_dds-7.7.0/resource/python_api}"
+    RTI_PYTHON_DIR="${RTI_PYTHON_DIR:-${NDDSHOME:-}/resource/python_api}"
     if [ -d "$RTI_PYTHON_DIR" ]; then
       python -m pip install "rti.connext>=7.6.0" -f "$RTI_PYTHON_DIR"
     else
       echo "WARNING: RTI Python API directory not found at $RTI_PYTHON_DIR"
-      echo "  Set RTI_PYTHON_DIR and re-source, or install manually:"
-      echo "    pip install rti.connext -f /path/to/rti/resource/python_api"
+      echo "  Ensure NDDSHOME is set or set RTI_PYTHON_DIR manually:"
+      echo "    RTI_PYTHON_DIR=/path/to/rti/resource/python_api source setup.sourceme $APPROACH"
     fi
   fi
 fi
 
 echo ""
 echo "Environment ready for: $APPROACH"
-echo "  Python: $(which python)"
-echo "  venv:   $REPO_ROOT/$VENV_DIR"
+echo "  Python:   $(which python)"
+echo "  venv:     $REPO_ROOT/$VENV_DIR"
+if [ -n "${NDDSHOME:-}" ]; then
+  echo "  NDDSHOME: $NDDSHOME"
+fi

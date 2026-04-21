@@ -75,19 +75,19 @@ The CLI is **uniform** across all three approaches:
 
 ```bash
 cd grpc/               # or grpc-dds/ or dds/
-./run_demo.sh all      # launch stations + robots + UI
+./demo_start.sh all      # launch stations + robots + UI
                        # open http://localhost:5000
-./stop_demo.sh         # stop everything
+./demo_stop.sh         # stop everything
 ```
 
 Individual components:
 
 ```bash
-./run_demo.sh stations           # all charging stations
-./run_demo.sh robots             # all robots
-./run_demo.sh ui                 # dashboard only
-./run_demo.sh robot tractor1     # single robot
-./run_demo.sh station station1   # single station
+./demo_start.sh stations           # all charging stations
+./demo_start.sh robots             # all robots
+./demo_start.sh ui                 # dashboard only
+./demo_start.sh robot tractor1     # single robot
+./demo_start.sh station station1   # single station
 ```
 
 ### gRPC: Generate Protobuf Stubs
@@ -96,19 +96,18 @@ The `grpc/` and `grpc-dds/` approaches require generated protobuf files.
 Run once after cloning:
 
 ```bash
-cd grpc/          # or grpc-dds/
-./run_protoc.sh
+cd grpc/          # or grpc-dds/ or dds/
+./types_generate.sh
 ```
 
-### DDS: Type Support Generation
+### Type Support Generation
 
-The `dds/` and `grpc-dds/` approaches use DDS types generated from
-`robot_types.xml`. This happens **automatically** the first time you run
-`./run_demo.sh` — the script invokes `rtiddsgen` if `robot_types.py` is
-not present. Make sure `rtiddsgen` is on your `PATH` or set `NDDSHOME`:
+Each approach requires generated type support files. Run once after cloning
+(or after changing type definitions):
 
 ```bash
-export NDDSHOME=/path/to/rti_connext_dds-7.x.x
+cd grpc/          # or grpc-dds/ or dds/
+./types_generate.sh
 ```
 
 ## Comparison Summary

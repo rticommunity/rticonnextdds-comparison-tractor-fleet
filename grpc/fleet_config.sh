@@ -1,8 +1,8 @@
 # Fleet configuration – the gRPC approach (pure gRPC).
-# Sourced by run_demo.sh and stop_demo.sh.
+# Sourced by demo_start.sh and demo_stop.sh.
 #
 # gRPC needs explicit ports for every listener.
-# Ports are computed from base + index in run_demo.sh.
+# Ports are computed from base + index in demo_start.sh.
 
 # ── Scenario (robot names, station positions, UI port) ──────────────────
 _FLEET_CFG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" && pwd)"

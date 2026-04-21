@@ -1,8 +1,8 @@
 /*
- * robot_types.idl — DDS type definitions for the Pure DDS approach
+ * robot_types.idl — DDS type definitions for the Hybrid (gRPC + DDS) approach
  *
- * Mirrors the gRPC approach's robot.proto: same enums, same field semantics.
- * See README §6 (Data Types) for the design rationale.
+ * Only pub-sub types live here.  Request-reply types (commands, charging
+ * slot negotiation) are defined in robot.proto for gRPC.
  *
  * NOTE: No 'timestamp' fields.  DDS provides source_timestamp and
  * reception_timestamp in the SampleInfo metadata of every sample —
@@ -14,7 +14,12 @@
  */
 
 // ═══════════════════════════════════════════════════════════════════════
-// Enums — mirror the gRPC approach protobuf enums exactly
+// Enums
+//
+// In the hybrid approach, Command enum and all request-reply types
+// (CommandRequest/Response, SlotReserve/Assignment, SlotRelease/Ack,
+// GotoParameters, SetPathParameters) are handled by gRPC — see robot.proto.
+// Only pub-sub enums and types remain here.
 // ═══════════════════════════════════════════════════════════════════════
 
 @appendable
@@ -36,16 +41,7 @@ enum RobotIntentType {
   @value(5) INTENT_CHARGE_DOCK     // rank 0, navigating to / on dock
 };
 
-@appendable
-enum Command {
-  @value(0) COMMAND_UNKNOWN,
-  @value(1) CMD_STOP,
-  @value(2) CMD_FOLLOW_PATH,
-  @value(3) CMD_GOTO,
-  @value(4) CMD_RESUME,
-  @value(5) CMD_SET_PATH,
-  @value(6) CMD_CHARGE   // operator-initiated: go charge now
-};
+// Command enum is defined in robot.proto (gRPC) — not needed here.
 
 // ═══════════════════════════════════════════════════════════════════════
 // Helper structs — reusable building blocks
@@ -87,19 +83,19 @@ struct KinematicState {
 // OperationalState: on change, RELIABLE / TRANSIENT_LOCAL
 @appendable
 struct OperationalState {
-  @key string<64>  robot_id;
-  RobotStatus      status;
-  double           battery_level;   // 0–100 %
+  @key string<64> robot_id;
+  RobotStatus     status;
+  double          battery_level;   // 0–100 %
 };
 
 // Intent: on change, RELIABLE / TRANSIENT_LOCAL
 @appendable
 struct Intent {
-  @key string<64>         robot_id;
-  RobotIntentType         intent_type;
-  Position                target_position;
-  sequence<Waypoint,64>   path_waypoints;   // ordered waypoint list
-  int32                   path_index;       // current waypoint index
+  @key string<64>       robot_id;
+  RobotIntentType       intent_type;
+  Position              target_position;
+  sequence<Waypoint,64> path_waypoints;   // ordered waypoint list
+  int32                 path_index;       // current waypoint index
 };
 
 // Telemetry: 1 Hz, BEST_EFFORT / VOLATILE
@@ -116,92 +112,15 @@ struct Telemetry {
 // VideoFrame: ~5 fps, BEST_EFFORT / VOLATILE
 @appendable
 struct VideoFrame {
-  @key string<64>           robot_id;
-  sequence<octet,1000000>   frame_data;   // JPEG bytes
+  @key string<64>         robot_id;
+  sequence<octet,1000000> frame_data;   // JPEG bytes
 };
 
-// ═══════════════════════════════════════════════════════════════════════
-// Command request-reply — used with rti.rpc.Requester/Replier
-//
-// No request_id field needed: rti.rpc correlates requests and replies
-// automatically via DDS SampleIdentity (writer GUID + sequence number),
-// just as gRPC correlates calls internally.
-// ═══════════════════════════════════════════════════════════════════════
-
-// GotoParameters — used by CMD_GOTO, CMD_FOLLOW_PATH, CMD_RESUME
-@appendable
-struct GotoParameters {
-  double x;
-  double y;
-  double speed;   // 0 = use default
-};
-
-// SetPathParameters — used by CMD_SET_PATH
-@appendable
-struct SetPathParameters {
-  sequence<Waypoint,64> waypoints;
-};
-
-@appendable
-struct CommandRequest {
-  string<64>  robot_id;
-  Command     command;
-  @optional GotoParameters    goto_params;       // CMD_GOTO / CMD_FOLLOW_PATH / CMD_RESUME
-  @optional SetPathParameters set_path_params;   // CMD_SET_PATH only
-};
-
-@appendable
-struct CommandResponse {
-  string<64>      robot_id;
-  boolean         success;
-  string<256>     description;
-  RobotStatus     resulting_status;
-  RobotIntentType resulting_intent;
-};
-
-// ═══════════════════════════════════════════════════════════════════════
-// Charging station — slot negotiation request-reply
-// Used with rti.rpc.Requester/Replier — same SampleIdentity correlation
-// as commands above.
-//
-// Two RPC pairs:
-//   SlotReserve → SlotAssignment  (reserve a queue slot)
-//   SlotRelease → SlotReleaseAck  (release when done)
-//
-// Robots pick the best station locally (using StationStatus pub-sub)
-// and send a single directed SlotReserve.
-// ═══════════════════════════════════════════════════════════════════════
-
-@appendable
-struct SlotReserve {
-  string<64> robot_id;
-  string<64> station_id;    // which station to reserve at
-  double     battery_level; // current % (informational)
-};
-
-@appendable
-struct SlotAssignment {
-  string<64> station_id;   // who sent this reply
-  string<64> slot_id;      // unique queue token
-  boolean    granted;      // true = slot reserved
-  int32      queue_rank;
-  double     dock_x;       // exact dock coordinates
-  double     dock_y;
-};
-
-@appendable
-struct SlotRelease {
-  string<64> robot_id;
-  string<64> slot_id;
-  string<64> station_id;   // target station
-};
-
-@appendable
-struct SlotReleaseAck {
-  string<64> station_id;   // who sent this ack
-  string<64> slot_id;      // which slot
-  boolean    success;
-};
+// Command request-reply and charging slot negotiation are handled entirely
+// by gRPC in the hybrid approach — see robot.proto.
+// The DDS-RPC types (CommandRequest/Response, GotoParameters,
+// SetPathParameters, SlotReserve/Assignment/Release/Ack) that appear in
+// the DDS approach's robot_types.idl are NOT needed here.
 
 // ═══════════════════════════════════════════════════════════════════════
 // Station status — pub-sub topic
@@ -217,21 +136,17 @@ struct QueueEntry {
 
 @appendable
 struct StationStatus {
-  @key string<64>          station_id;
-  double                   dock_x;
-  double                   dock_y;
-  boolean                  is_occupied;
-  string<64>               docked_robot_id;   // "" if free
-  sequence<QueueEntry,16>  queue;
+  @key string<64>         station_id;
+  double                  dock_x;
+  double                  dock_y;
+  boolean                 is_occupied;
+  string<64>              docked_robot_id;   // "" if free
+  sequence<QueueEntry,16> queue;
 };
 
 // ═══════════════════════════════════════════════════════════════════════
 // CoveragePoint — on-change, RELIABLE / TRANSIENT_LOCAL
-//
-// Published by the robot when actively working a path
-// (INTENT_FOLLOW_PATH + past first waypoint).  Distance-filtered at the
-// source (≥1 arena unit between samples).  Late-joining UIs receive the
-// full coverage map from the writer's TRANSIENT_LOCAL cache.
+// Distance-filtered breadcrumb trail per robot.
 // ═══════════════════════════════════════════════════════════════════════
 
 @appendable

@@ -133,7 +133,7 @@ class RobotNode:
         self.address = f"localhost:{port}"
 
         # Build the ordered list of robot IDs for the whole fleet.
-        # run_demo.sh names robots "robot1" … "robotN" by port-list order.
+        # demo_start.sh names robots "robot1" … "robotN" by port-list order.
         # This is used by the 3D renderer so colours match the 2D UI.
         self._fleet_robot_ids: List[str] = []
         if fleet_port_list:

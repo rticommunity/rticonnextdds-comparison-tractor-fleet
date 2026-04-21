@@ -1,23 +1,17 @@
 #!/bin/bash
 
-# Script to run the Hybrid DDS + gRPC robot demo.
+# Script to run the Full Mesh gRPC robot demo.
 #
-# DDS handles pub-sub (automatic discovery via SPDP).
-# gRPC handles commands (robot → UI) and charging negotiations.
-# Zeroconf discovers gRPC endpoints for the UI command path.
+# gRPC endpoints are discovered automatically via Zeroconf mDNS.
+# Each robot gets a port derived from its position in ROBOTS[].
 #
 # Usage:
-#   ./run_demo.sh all              - Run stations + robots + UI
-#   ./run_demo.sh robots           - Run all robots in background
-#   ./run_demo.sh stations         - Run all stations in background
-#   ./run_demo.sh ui               - Launch the fleet dashboard UI
-#   ./run_demo.sh robot <name>     - Run a single robot
-#   ./run_demo.sh station <name>   - Run a single station
-#
-# Examples (separate VS Code terminals):
-#   Terminal 1:  ./run_demo.sh stations
-#   Terminal 2:  ./run_demo.sh robots
-#   Terminal 3:  ./run_demo.sh ui
+#   ./demo_start.sh all              - Run stations + robots + UI
+#   ./demo_start.sh robots           - Run all robots in background
+#   ./demo_start.sh stations         - Run all stations in background
+#   ./demo_start.sh ui               - Launch the fleet dashboard UI
+#   ./demo_start.sh robot <name>     - Run a single robot
+#   ./demo_start.sh station <name>   - Run a single station
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -29,6 +23,8 @@ if [ -z "$VIRTUAL_ENV" ] && [ -f "$VENV_DIR/bin/activate" ]; then
 fi
 
 # ── Fleet configuration ──────────────────────────────────────────────────
+# Sets ROBOTS[], STATIONS[], UI_PORT (from shared/fleet_common.sh)
+# and  ROBOT_BASE_PORT, STATION_BASE_PORT (approach-specific).
 source "$SCRIPT_DIR/fleet_config.sh"
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -53,56 +49,21 @@ station_lookup() {
     echo "Error: unknown station '$1'. Known: $(printf '%s ' "${STATIONS[@]}")" >&2; exit 1
 }
 
-echo "Hybrid: DDS + gRPC Demo"
-echo "===================================="
+echo "Pure gRPC: Full Mesh Streams Demo"
+echo "================================"
 echo ""
 
-# ── Locate RTI Connext DDS installation ──────────────────────────────────
-# NDDSHOME must be set so the runtime can find its license file.
-if [ -z "${NDDSHOME:-}" ]; then
-    for d in /Applications/rti_connext_dds-* \
-             /opt/rti_connext_dds-* \
-             "$HOME/rti_connext_dds-"*; do
-        [ -d "$d/bin" ] && NDDSHOME="$d"   # picks the last (newest) match
-    done
-    if [ -n "${NDDSHOME:-}" ]; then
-        export NDDSHOME
-        echo "NOTE: NDDSHOME was not set — auto-detected $NDDSHOME"
-    else
-        echo "ERROR: NDDSHOME is not set and no Connext installation found."
-        echo "  Set NDDSHOME to your RTI Connext DDS installation directory."
-        exit 1
-    fi
-fi
-export NDDSHOME
-# ─────────────────────────────────────────────────────────────────────────
-
-# Generate protobuf code if needed
+# Generate type support if needed
 if [ ! -f "robot_pb2.py" ]; then
-    echo "Generating protobuf code..."
-    python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. robot.proto
-fi
-
-# Generate DDS type support if needed
-if [ ! -f "robot_types.py" ]; then
-    RTIDDSGEN="$NDDSHOME/bin/rtiddsgen"
-    if command -v rtiddsgen &>/dev/null; then
-        RTIDDSGEN=rtiddsgen
-    elif [ ! -x "$RTIDDSGEN" ]; then
-        echo "ERROR: rtiddsgen not found at $RTIDDSGEN or on PATH."
-        exit 1
-    fi
-    echo "Generating DDS type support (using $RTIDDSGEN)..."
-    "$RTIDDSGEN" -language python -d . robot_types.xml
+    ./types_generate.sh
 fi
 
 case "${1:---help}" in
     ui)
         echo "Starting Fleet Dashboard UI on port $UI_PORT..."
-        echo "DDS domain $DOMAIN_ID — pub-sub data discovered automatically"
-        echo "gRPC commands via Zeroconf discovery"
+        echo "Robots discovered automatically via Zeroconf mDNS"
         echo ""
-        python robot_ui.py --domain "$DOMAIN_ID" --ui-port "$UI_PORT" --same-host
+        python robot_ui.py --ui-port "$UI_PORT" --same-host
         ;;
     robot)
         ROBOT_NAME="$2"
@@ -113,8 +74,8 @@ case "${1:---help}" in
         fi
         IDX=$(robot_index "$ROBOT_NAME")
         PORT=$(robot_port "$IDX")
-        echo "Starting $ROBOT_NAME (DDS domain $DOMAIN_ID, gRPC port $PORT)..."
-        python robot_node.py --id "$ROBOT_NAME" --domain "$DOMAIN_ID" --grpc-port "$PORT"
+        echo "Starting $ROBOT_NAME (port $PORT, mDNS discovery)..."
+        python robot_node.py --id "$ROBOT_NAME" --fleet-port "$PORT"
         ;;
     station)
         STATION_NAME="$2"
@@ -125,22 +86,21 @@ case "${1:---help}" in
         fi
         read -r sidx sx sy <<< "$(station_lookup "$STATION_NAME")"
         SPORT=$(station_port "$sidx")
-        echo "Starting $STATION_NAME on gRPC port $SPORT (dock at $sx,$sy)..."
-        python charging_station.py --station-id "$STATION_NAME" --domain "$DOMAIN_ID" \
-            --port "$SPORT" \
+        echo "Starting $STATION_NAME on port $SPORT (dock at $sx,$sy)..."
+        python charging_station.py --port "$SPORT" \
+            --station-id "$STATION_NAME" \
             --dock-x "$sx" --dock-y "$sy"
         ;;
     robots)
-        echo "Starting all robots in background..."
-        echo "DDS domain $DOMAIN_ID, gRPC discovery via Zeroconf"
+        echo "Starting all robots in background (mDNS discovery)..."
         echo ""
 
         PIDS=()
         for (( i=0; i<${#ROBOTS[@]}; i++ )); do
             NAME="${ROBOTS[$i]}"
             PORT=$(robot_port $i)
-            echo "  Starting $NAME (gRPC port $PORT)"
-            python robot_node.py --id "$NAME" --domain "$DOMAIN_ID" --grpc-port "$PORT" &
+            echo "  Starting $NAME on port $PORT"
+            python robot_node.py --id "$NAME" --fleet-port "$PORT" &
             PIDS+=($!)
             sleep 2
         done
@@ -160,16 +120,15 @@ case "${1:---help}" in
         ;;
     stations)
         echo "Starting all stations in background..."
-        echo "DDS domain $DOMAIN_ID"
         echo ""
 
         PIDS=()
         for (( si=0; si<${#STATIONS[@]}; si++ )); do
             read -r sname sx sy <<< "${STATIONS[$si]}"
             sport=$(station_port $si)
-            echo "  Starting $sname on gRPC port $sport (dock at $sx,$sy)"
-            python charging_station.py --station-id "$sname" --domain "$DOMAIN_ID" \
-                --port "$sport" \
+            echo "  Starting $sname on port $sport (dock at $sx,$sy)"
+            python charging_station.py --port "$sport" \
+                --station-id "$sname" \
                 --dock-x "$sx" --dock-y "$sy" &
             PIDS+=($!)
         done
@@ -188,9 +147,8 @@ case "${1:---help}" in
         wait
         ;;
     all)
-        echo "Starting all robots + stations in background..."
-        echo "DDS domain $DOMAIN_ID — pub-sub auto-discovered via SPDP"
-        echo "gRPC command/charging endpoints discovered via Zeroconf mDNS"
+        echo "Starting all stations + robots + UI..."
+        echo "gRPC endpoints discovered via Zeroconf mDNS"
         echo ""
 
         PIDS=()
@@ -199,9 +157,9 @@ case "${1:---help}" in
         for (( si=0; si<${#STATIONS[@]}; si++ )); do
             read -r sname sx sy <<< "${STATIONS[$si]}"
             sport=$(station_port $si)
-            echo "  Starting $sname on gRPC port $sport (dock at $sx,$sy)"
-            python charging_station.py --station-id "$sname" --domain "$DOMAIN_ID" \
-                --port "$sport" \
+            echo "  Starting $sname on port $sport (dock at $sx,$sy)"
+            python charging_station.py --port "$sport" \
+                --station-id "$sname" \
                 --dock-x "$sx" --dock-y "$sy" &
             PIDS+=($!)
         done
@@ -210,34 +168,25 @@ case "${1:---help}" in
         for (( i=0; i<${#ROBOTS[@]}; i++ )); do
             NAME="${ROBOTS[$i]}"
             PORT=$(robot_port $i)
-            echo "  Starting $NAME (gRPC port $PORT)"
-            python robot_node.py --id "$NAME" --domain "$DOMAIN_ID" --grpc-port "$PORT" &
+            echo "  Starting $NAME on port $PORT"
+            python robot_node.py --id "$NAME" --fleet-port "$PORT" &
             PIDS+=($!)
             sleep 2
         done
 
-        echo "Starting Fleet Dashboard UI on port $UI_PORT..."
-        echo "DDS domain $DOMAIN_ID — pub-sub data discovered automatically"
-        echo "gRPC commands via Zeroconf discovery"
-        echo ""
-        python robot_ui.py --domain "$DOMAIN_ID" --ui-port "$UI_PORT" --same-host
-
-
         cleanup() {
             echo ""
-            echo "Stopping all robots and stations..."
+            echo "Stopping all..."
             kill "${PIDS[@]}" 2>/dev/null
             exit 0
         }
         trap cleanup SIGINT SIGTERM
 
         echo ""
-        echo "All participants started.  PIDs: ${PIDS[*]}"
-        echo "Press Ctrl+C to stop everything"
+        echo "All robots + stations started.  PIDs: ${PIDS[*]}"
+        echo "Launching UI on port $UI_PORT..."
         echo ""
-        echo "To launch the dashboard in another terminal:"
-        echo "  ./run_demo.sh ui"
-        wait
+        python robot_ui.py --ui-port "$UI_PORT" --same-host
         ;;
     -h|--help|*)
         echo "Usage:"
@@ -251,7 +200,7 @@ case "${1:---help}" in
         echo "Robots: ${ROBOTS[*]}"
         echo "Stations: $(printf '%s ' "${STATIONS[@]}")"
         echo ""
-        echo "DDS domain: $DOMAIN_ID | gRPC via Zeroconf mDNS"
+        echo "gRPC discovery via Zeroconf mDNS (no port lists needed)."
         exit 0
         ;;
 esac

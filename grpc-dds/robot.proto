@@ -9,7 +9,7 @@ package robot;
 //   • RobotCommand  — operator sends commands to individual robots.
 //   • ChargingStation — robots negotiate charging slots with stations.
 //
-// All pub-sub data flows use DDS (see robot_types.xml / robot_types.py):
+// All pub-sub data flows use DDS (see robot_types.idl / robot_types.py):
 //   KinematicState, OperationalState, Intent, Telemetry, VideoFrame,
 //   StationStatus.
 //

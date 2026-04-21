@@ -1,5 +1,5 @@
 # Fleet configuration – the DDS approach (pure DDS).
-# Sourced by run_demo.sh and stop_demo.sh.
+# Sourced by demo_start.sh and demo_stop.sh.
 #
 # DDS discovers everything — no port assignments needed.
 

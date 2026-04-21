@@ -2,7 +2,7 @@
 
 > This document fully specifies the `robot_ui.py` application so that an AI agent
 > (or developer) can re-create it from scratch.  It assumes the reader has access
-> to the XML type definitions (`robot_types.xml`), the auto-generated Python types
+> to the IDL type definitions (`robot_types.idl`), the auto-generated Python types
 > (`robot_types.py`), and the QoS profiles (`robot_qos.xml`).
 
 ---
@@ -36,7 +36,7 @@ key field in each sample identifies the source.
 |-------|-----------|
 | Language | Python 3.14.3+ |
 | Middleware | RTI Connext DDS 7.6.0+ (`rti.connextdds`, `rti.idl`, `rti.rpc`) |
-| Type generation | `rtiddsgen -language python robot_types.xml` → `robot_types.py` |
+| Type generation | `rtiddsgen -language python robot_types.idl` → `robot_types.py` |
 | QoS configuration | `robot_qos.xml` — Pattern-based profiles (`BuiltinQosLib::Pattern.*`) |
 | Web framework | Flask (single-file, `render_template_string`) |
 | Live updates | Server-Sent Events (SSE) at 5 Hz |
@@ -497,8 +497,8 @@ served by the `/ground_texture.jpg` route.
 
 | File | Purpose |
 |------|---------|
-| `robot_types.xml` | DDS IDL-XML type definitions — single source of truth |
-| `robot_types.py` | Auto-generated Python types (`rtiddsgen -language python robot_types.xml`) |
+| `robot_types.idl` | DDS IDL type definitions — single source of truth |
+| `robot_types.py` | Auto-generated Python types (`rtiddsgen -language python robot_types.idl`) |
 | `robot_qos.xml` | QoS profiles — Pattern-based (`BuiltinQosLib::Pattern.*`) |
 
 ### External Dependencies
@@ -565,7 +565,7 @@ The UI uses the following types from `robot_types.py`:
 
 ## 14  Deployment
 
-The UI is launched by `run_demo.sh` after the robot nodes and charging stations:
+The UI is launched by `demo_start.sh` after the robot nodes and charging stations:
 
 ```bash
 # Start the dashboard

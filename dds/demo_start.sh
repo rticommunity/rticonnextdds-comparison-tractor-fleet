@@ -6,17 +6,18 @@
 # All participants on the same domain ID find each other via SPDP.
 #
 # Usage:
-#   ./run_demo.sh all              - Run stations + robots + UI
-#   ./run_demo.sh robots           - Run all robots in background
-#   ./run_demo.sh stations         - Run all stations in background
-#   ./run_demo.sh ui               - Launch the fleet dashboard UI
-#   ./run_demo.sh robot <name>     - Run a single robot
-#   ./run_demo.sh station <name>   - Run a single station
+#   ./demo_start.sh all              - Run stations + robots + UI
+#   ./demo_start.sh robots           - Run all robots in background
+#   ./demo_start.sh stations         - Run all stations in background
+#   ./demo_start.sh ui               - Launch the fleet dashboard UI
+#   ./demo_start.sh persistence      - Run RTI Persistence Service
+#   ./demo_start.sh robot <name>     - Run a single robot
+#   ./demo_start.sh station <name>   - Run a single station
 #
 # Examples (separate VS Code terminals):
-#   Terminal 1:  ./run_demo.sh stations
-#   Terminal 2:  ./run_demo.sh robots
-#   Terminal 3:  ./run_demo.sh ui
+#   Terminal 1:  ./demo_start.sh stations
+#   Terminal 2:  ./demo_start.sh robots
+#   Terminal 3:  ./demo_start.sh ui
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -46,37 +47,16 @@ echo "Pure DDS (Connext) Demo"
 echo "====================================="
 echo ""
 
-# ── Locate RTI Connext DDS installation ──────────────────────────────────
-# NDDSHOME must be set so the runtime can find its license file.
+# NDDSHOME is exported by setup.sourceme — source it first if not set.
 if [ -z "${NDDSHOME:-}" ]; then
-    for d in /Applications/rti_connext_dds-* \
-             /opt/rti_connext_dds-* \
-             "$HOME/rti_connext_dds-"*; do
-        [ -d "$d/bin" ] && NDDSHOME="$d"   # picks the last (newest) match
-    done
-    if [ -n "${NDDSHOME:-}" ]; then
-        export NDDSHOME
-        echo "NOTE: NDDSHOME was not set — auto-detected $NDDSHOME"
-    else
-        echo "ERROR: NDDSHOME is not set and no Connext installation found."
-        echo "  Set NDDSHOME to your RTI Connext DDS installation directory."
-        exit 1
-    fi
+    echo "ERROR: NDDSHOME is not set. Source setup.sourceme first:"
+    echo "  source ../setup.sourceme dds"
+    exit 1
 fi
-export NDDSHOME
-# ─────────────────────────────────────────────────────────────────────────
 
-# Generate DDS type support if needed
+# Generate type support if needed
 if [ ! -f "robot_types.py" ]; then
-    RTIDDSGEN="$NDDSHOME/bin/rtiddsgen"
-    if command -v rtiddsgen &>/dev/null; then
-        RTIDDSGEN=rtiddsgen
-    elif [ ! -x "$RTIDDSGEN" ]; then
-        echo "ERROR: rtiddsgen not found at $RTIDDSGEN or on PATH."
-        exit 1
-    fi
-    echo "Generating DDS type support (using $RTIDDSGEN)..."
-    "$RTIDDSGEN" -language python -d . robot_types.xml
+    ./types_generate.sh
 fi
 
 case "${1:---help}" in
@@ -85,6 +65,20 @@ case "${1:---help}" in
         echo "DDS domain $DOMAIN_ID — robots discovered automatically"
         echo ""
         python robot_ui.py --domain "$DOMAIN_ID" --ui-port "$UI_PORT"
+        ;;
+    persistence)
+        echo "RTI Persistence Service"
+        echo "====================================="
+        echo "NDDSHOME:  $NDDSHOME"
+        STORAGE_DIR="$SCRIPT_DIR/persistent_data"
+        mkdir -p "$STORAGE_DIR"
+        export STORAGE_DIRECTORY="$STORAGE_DIR"
+        echo "Storage:   $STORAGE_DIR"
+        echo "Config:    defaultDisk (auto-discovers TRANSIENT topics)"
+        echo ""
+        echo "Press Ctrl+C to stop"
+        echo ""
+        exec "$NDDSHOME/bin/rtipersistenceservice" -cfgName defaultDisk
         ;;
     robot)
         ROBOT_NAME="$2"
@@ -168,14 +162,23 @@ case "${1:---help}" in
         echo "DDS domain $DOMAIN_ID — all participants discover each other automatically"
         echo ""
         echo "TIP: For separate terminals, run each component individually:"
-        echo "  ./run_demo.sh robot <name>"
-        echo "  ./run_demo.sh station <name> --dock-x X --dock-y Y"
-        echo "  ./run_demo.sh ui"
+        echo "  ./demo_start.sh robot <name>"
+        echo "  ./demo_start.sh station <name> --dock-x X --dock-y Y"
+        echo "  ./demo_start.sh ui"
         echo ""
 
         PIDS=()
 
-        # Launch charging stations first
+        # Launch Persistence Service first so TRANSIENT data is captured from the start
+        STORAGE_DIR="$SCRIPT_DIR/persistent_data"
+        mkdir -p "$STORAGE_DIR"
+        export STORAGE_DIRECTORY="$STORAGE_DIR"
+        echo "  Starting RTI Persistence Service (storage: $STORAGE_DIR)"
+        "$NDDSHOME/bin/rtipersistenceservice" -cfgName defaultDisk &
+        PIDS+=($!)
+        sleep 1
+
+        # Launch charging stations
         for (( si=0; si<${#STATIONS[@]}; si++ )); do
             read -r sname sx sy <<< "${STATIONS[$si]}"
             echo "  Starting $sname (dock at $sx,$sy)"
@@ -199,7 +202,7 @@ case "${1:---help}" in
 
         cleanup() {
             echo ""
-            echo "Stopping all robots and stations..."
+            echo "Stopping all robots, stations, and persistence service..."
             kill "${PIDS[@]}" 2>/dev/null
             exit 0
         }
@@ -210,7 +213,7 @@ case "${1:---help}" in
         echo "Press Ctrl+C to stop everything"
         echo ""
         echo "To launch the dashboard in another terminal:"
-        echo "  ./run_demo.sh ui"
+        echo "  ./demo_start.sh ui"
         wait
         ;;
     -h|--help|*)
@@ -219,6 +222,7 @@ case "${1:---help}" in
         echo "  $0 robots           Run all robots in background"
         echo "  $0 stations         Run all stations in background"
         echo "  $0 ui               Launch the dashboard UI"
+        echo "  $0 persistence      Run RTI Persistence Service"
         echo "  $0 robot <name>     Run a single robot"
         echo "  $0 station <name>   Run a single station"
         echo ""

@@ -310,7 +310,7 @@ The application is a **single Python file** (`charging_station.py`) that:
 
 ## 14  Deployment
 
-Charging stations are launched by `fleet_config.sh` (or `run_demo.sh`) before
+Charging stations are launched by `fleet_config.sh` (or `demo_start.sh`) before
 the robot nodes.  Typical configuration:
 
 ```bash

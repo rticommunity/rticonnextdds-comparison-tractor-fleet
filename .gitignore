@@ -3,11 +3,11 @@ venv/
 __pycache__/
 *.pyc
 
-# Generated protobuf files (recreated by run_protoc.sh)
+# Generated protobuf files (recreated by types_generate.sh)
 *_pb2.py
 *_pb2_grpc.py
 
-# Generated DDS types (recreated by rtiddsgen)
+# Generated DDS types (recreated by rtiddsgen from robot_types.idl)
 grpc-dds/robot_types.py
 dds/robot_types.py
 

@@ -8,27 +8,27 @@
 
 ### Component Specs
 
-[`robot_proto_spec.md`](robot_proto_spec.md) ·
-[`robot_node_spec.md`](robot_node_spec.md) ·
-[`robot_ui_spec.md`](robot_ui_spec.md) ·
-[`charging_station_spec.md`](charging_station_spec.md)
+[`robot_proto_spec.md`](spec/robot_proto_spec.md) ·
+[`robot_node_spec.md`](spec/robot_node_spec.md) ·
+[`robot_ui_spec.md`](spec/robot_ui_spec.md) ·
+[`charging_station_spec.md`](spec/charging_station_spec.md)
 
 ### Quick Start
 
 ```bash
-./run_protoc.sh            # generate protobuf stubs (first time / after proto changes)
-./run_demo.sh all          # launch stations + robots + UI → http://localhost:5000
-./stop_demo.sh             # stop everything
+./types_generate.sh   # generate protobuf stubs (first time / after proto changes)
+./demo_start.sh all          # launch stations + robots + UI → http://localhost:5000
+./demo_stop.sh             # stop everything
 ```
 
 Individual components:
 
 ```bash
-./run_demo.sh stations     # all charging stations
-./run_demo.sh robots       # all robots (mDNS discovery)
-./run_demo.sh ui           # dashboard UI
-./run_demo.sh robot tractor1   # single robot (port auto-derived from name)
-./run_demo.sh station station1 # single station (dock coords auto-derived)
+./demo_start.sh stations     # all charging stations
+./demo_start.sh robots       # all robots (mDNS discovery)
+./demo_start.sh ui           # dashboard UI
+./demo_start.sh robot tractor1   # single robot (port auto-derived from name)
+./demo_start.sh station station1 # single station (dock coords auto-derived)
 ```
 
 The CLI is **uniform** across all three approaches — same commands, same
@@ -148,17 +148,17 @@ robot subscribes to them.  Robots call station RPCs when they need to charge.
 
 | File | Purpose | Detailed Spec |
 |------|---------|---------------|
-| `robot.proto` | Protobuf / gRPC service definitions (services, messages, enums) | [`robot_proto_spec.md`](robot_proto_spec.md) |
+| `robot.proto` | Protobuf / gRPC service definitions (services, messages, enums) | [`robot_proto_spec.md`](spec/robot_proto_spec.md) |
 | `robot_pb2.py` | Generated Python protobuf code (message classes) | — (auto-generated, gitignored) |
 | `robot_pb2_grpc.py` | Generated Python gRPC stubs and servicers | — (auto-generated, gitignored) |
-| `robot_node.py` | Robot node — full mesh networking, path following, collision avoidance, commands, charging, video rendering, coverage tracking | [`robot_node_spec.md`](robot_node_spec.md) |
-| `charging_station.py` | Charging station — FIFO dock queue, slot negotiation, status streaming | [`charging_station_spec.md`](charging_station_spec.md) |
-| `robot_ui.py` | Flask web dashboard — gRPC subscriber, SSE publisher, command proxy, video proxy, charging panel, coverage map overlay | [`robot_ui_spec.md`](robot_ui_spec.md) |
+| `robot_node.py` | Robot node — full mesh networking, path following, collision avoidance, commands, charging, video rendering, coverage tracking | [`robot_node_spec.md`](spec/robot_node_spec.md) |
+| `charging_station.py` | Charging station — FIFO dock queue, slot negotiation, status streaming | [`charging_station_spec.md`](spec/charging_station_spec.md) |
+| `robot_ui.py` | Flask web dashboard — gRPC subscriber, SSE publisher, command proxy, video proxy, charging panel, coverage map overlay | [`robot_ui_spec.md`](spec/robot_ui_spec.md) |
 | `fleet_discovery.py` | Zeroconf mDNS/DNS-SD — advertise & discover robots and charging stations | — |
 | `fleet_config.sh` | Transport config for this approach (gRPC base ports); sources `../shared/fleet_common.sh` for scenario data | — |
-| `run_demo.sh` | Uniform launch script: `all`, `robots`, `stations`, `ui`, `robot <name>`, `station <name>` | — |
-| `run_protoc.sh` | Regenerate `robot_pb2*.py` from `robot.proto` | — |
-| `stop_demo.sh` | Kill all running robot, station, and UI processes, free ports | — |
+| `demo_start.sh` | Uniform launch script: `all`, `robots`, `stations`, `ui`, `robot <name>`, `station <name>` | — |
+| `types_generate.sh` | Regenerate `robot_pb2*.py` from `robot.proto` | — |
+| `demo_stop.sh` | Kill all running robot, station, and UI processes, free ports | — |
 
 **Shared assets** (in `../shared/`):
 
@@ -255,7 +255,7 @@ when services appear or disappear, triggering connection or cleanup.
 
 ## 5  Protocol Summary
 
-Defined in `robot.proto` (see [`robot_proto_spec.md`](robot_proto_spec.md) for
+Defined in `robot.proto` (see [`robot_proto_spec.md`](spec/robot_proto_spec.md) for
 design rationale).
 
 ### Services
@@ -292,8 +292,7 @@ design rationale).
 ### Generate Protobuf Stubs
 
 ```bash
-./run_protoc.sh
-# or: python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. robot.proto
+./types_generate.sh# or: python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. robot.proto
 ```
 
 This produces `robot_pb2.py` and `robot_pb2_grpc.py`.  These files are
@@ -317,33 +316,33 @@ Edit this file to add or remove robots or stations.  All scripts source it.
 
 ```bash
 # Charging stations + all 5 robots (peers found via mDNS):
-./run_demo.sh discover
+./demo_start.sh discover
 
 # Dashboard UI (discovers robots + stations via mDNS):
-./run_demo.sh ui-discover    # http://localhost:5000
+./demo_start.sh ui-discover    # http://localhost:5000
 ```
 
 ### Launch (Static Mode — No Zeroconf)
 
 ```bash
 # All 5 robots in one terminal (port list passed on CLI):
-./run_demo.sh all
+./demo_start.sh all
 
 # Or individual robots in separate terminals:
-./run_demo.sh fred 1       # port 50051
-./run_demo.sh alice 2      # port 50052
-./run_demo.sh bob 3        # port 50053
-./run_demo.sh carol 4      # port 50054
-./run_demo.sh dave 5       # port 50055
+./demo_start.sh fred 1       # port 50051
+./demo_start.sh alice 2      # port 50052
+./demo_start.sh bob 3        # port 50053
+./demo_start.sh carol 4      # port 50054
+./demo_start.sh dave 5       # port 50055
 
 # Dashboard UI (static):
-./run_demo.sh ui           # http://localhost:5000
+./demo_start.sh ui           # http://localhost:5000
 ```
 
 ### Stop
 
 ```bash
-./stop_demo.sh             # kills all robot_node, charging_station, and robot_ui processes
+./demo_stop.sh             # kills all robot_node, charging_station, and robot_ui processes
 ```
 
 ---

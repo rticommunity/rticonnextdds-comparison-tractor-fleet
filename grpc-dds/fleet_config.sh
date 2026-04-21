@@ -1,5 +1,5 @@
 # Fleet configuration – the hybrid approach (hybrid DDS pub-sub + gRPC commands).
-# Sourced by run_demo.sh and stop_demo.sh.
+# Sourced by demo_start.sh and demo_stop.sh.
 #
 # DDS handles pub-sub (automatic discovery).
 # gRPC handles commands and charging — needs explicit ports.

@@ -1,0 +1,216 @@
+@appendable
+enum RobotStatus {
+  @value(0)
+  STATUS_UNKNOWN,
+  @value(1)
+  STATUS_MOVING,
+  @value(2)
+  STATUS_IDLE,
+  @value(3)
+  STATUS_HOLDING,
+  @value(4)
+  STATUS_CHARGING
+};
+@appendable
+enum RobotIntentType {
+  @value(0)
+  INTENT_UNKNOWN,
+  @value(1)
+  INTENT_FOLLOW_PATH,
+  @value(2)
+  INTENT_GOTO,
+  @value(3)
+  INTENT_IDLE,
+  @value(4)
+  INTENT_CHARGE_QUEUE,
+  @value(5)
+  INTENT_CHARGE_DOCK
+};
+@appendable
+enum Command {
+  @value(0)
+  COMMAND_UNKNOWN,
+  @value(1)
+  CMD_STOP,
+  @value(2)
+  CMD_FOLLOW_PATH,
+  @value(3)
+  CMD_GOTO,
+  @value(4)
+  CMD_RESUME,
+  @value(5)
+  CMD_SET_PATH,
+  @value(6)
+  CMD_CHARGE
+};
+
+@appendable
+struct Position {
+  double x;
+  double y;
+  double z;
+};
+
+
+@appendable
+struct Velocity3 {
+  double x;
+  double y;
+  double z;
+};
+
+
+@appendable
+struct Waypoint {
+  double x;
+  double y;
+};
+
+
+@appendable
+struct KinematicState {
+  @key
+  string<64> robot_id;
+  Position position;
+  Velocity3 velocity;
+  double heading;
+};
+
+
+@appendable
+struct OperationalState {
+  @key
+  string<64> robot_id;
+  RobotStatus status;
+  double battery_level;
+};
+
+
+@appendable
+struct Intent {
+  @key
+  string<64> robot_id;
+  RobotIntentType intent_type;
+  Position target_position;
+  sequence<Waypoint,64> path_waypoints;
+  int32 path_index;
+};
+
+
+@appendable
+struct Telemetry {
+  @key
+  string<64> robot_id;
+  double cpu_usage;
+  double memory_usage;
+  double temperature;
+  double signal_strength;
+};
+
+
+@appendable
+struct VideoFrame {
+  @key
+  string<64> robot_id;
+  sequence<octet,1000000> frame_data;
+};
+
+
+@appendable
+struct GotoParameters {
+  double x;
+  double y;
+  double speed;
+};
+
+// SetPathParameters — used by CMD_SET_PATH
+@appendable
+struct SetPathParameters {
+  sequence<Waypoint,64> waypoints;
+};
+
+
+@appendable
+struct CommandRequest {
+  string<64> robot_id;
+  Command command;
+  @optional GotoParameters goto_params;
+  @optional SetPathParameters set_path_params;
+};
+
+
+@appendable
+struct CommandResponse {
+  string<64> robot_id;
+  boolean success;
+  string<256> description;
+  RobotStatus resulting_status;
+  RobotIntentType resulting_intent;
+};
+
+
+@appendable
+struct SlotReserve {
+  string<64> robot_id;
+  string<64> station_id;
+  double battery_level;
+};
+
+
+@appendable
+struct SlotAssignment {
+  string<64> station_id;
+  string<64> slot_id;
+  boolean granted;
+  int32 queue_rank;
+  double dock_x;
+  double dock_y;
+};
+
+
+@appendable
+struct SlotRelease {
+  string<64> robot_id;
+  string<64> slot_id;
+  string<64> station_id;
+};
+
+
+@appendable
+struct SlotReleaseAck {
+  string<64> station_id;
+  string<64> slot_id;
+  boolean success;
+};
+
+
+@appendable
+struct QueueEntry {
+  string<64> robot_id;
+  int32 rank;
+  boolean confirmed;
+};
+
+
+@appendable
+struct StationStatus {
+  @key
+  string<64> station_id;
+  double dock_x;
+  double dock_y;
+  boolean is_occupied;
+  string<64> docked_robot_id;
+  sequence<QueueEntry,16> queue;
+};
+
+// CoveragePoint — emitted when a tractor is actively working a path.
+// On-change (distance-filtered at source), RELIABLE + TRANSIENT_LOCAL.
+// Late-joining UIs receive the full coverage map from the writer cache.
+@appendable
+struct CoveragePoint {
+  @key
+  string<64> robot_id;
+  double x;
+  double y;
+};
+

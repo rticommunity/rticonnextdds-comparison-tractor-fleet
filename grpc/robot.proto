@@ -1,0 +1,228 @@
+syntax = "proto3";
+
+package robot;
+
+// Command service for controlling robots
+service RobotCommand {
+    rpc SendCommand(CommandRequest) returns (CommandResponse);
+}
+
+// Streaming service for state updates and video (server-streaming)
+service RobotStreaming {
+    rpc StreamKinematicState(SubscribeRequest) returns (stream KinematicState);
+    rpc StreamOperationalState(SubscribeRequest) returns (stream OperationalState);
+    rpc StreamIntent(SubscribeRequest) returns (stream IntentUpdate);
+    rpc StreamTelemetry(SubscribeRequest) returns (stream TelemetryUpdate);
+    rpc RequestVideo(VideoRequest) returns (stream VideoFrame);
+    rpc StreamCoverage(SubscribeRequest) returns (stream CoveragePoint);
+}
+
+// Charging station service – robots request a charge slot, the station
+// manages a FIFO queue so only one robot charges at a time.
+// In gRPC each robot must know the station's address and call individually.
+// (In DDS-RPC: the robot would broadcast a single request via multicast.)
+service ChargingStation {
+    rpc RequestSlot(SlotRequest)   returns (SlotOffer);     // non-committing: get estimated wait
+    rpc ConfirmSlot(SlotConfirm)   returns (SlotAssignment); // reserve the slot
+    rpc ReleaseSlot(SlotRelease)   returns (SlotReleaseAck);        // done charging or cancelled
+    rpc StreamStatus(StationStatusRequest) returns (stream StationStatusResponse); // UI subscribes
+}
+
+// Messages
+
+message SubscribeRequest {
+    string subscriber_id = 1;
+}
+
+// Enums
+enum RobotStatus {
+    STATUS_UNKNOWN  = 0;
+    STATUS_MOVING   = 1;
+    STATUS_IDLE     = 2;   // parked / powered down — no movement, no avoidance
+    STATUS_HOLDING  = 3;   // arrived at goal, holding position — avoidance still active
+    STATUS_CHARGING = 4;   // docked at a charging station
+}
+
+enum RobotIntent {
+    INTENT_UNKNOWN = 0;
+    INTENT_FOLLOW_PATH  = 1;
+    INTENT_GOTO         = 2;
+    INTENT_IDLE         = 3;
+    INTENT_CHARGE_QUEUE = 4;   // queued at station, waiting for dock to be free
+    INTENT_CHARGE_DOCK  = 5;   // rank 0 — actively navigating to / docked at the dock
+}
+
+enum Command {
+    COMMAND_UNKNOWN  = 0;
+    CMD_STOP         = 1;
+    CMD_FOLLOW_PATH  = 2;
+    CMD_GOTO         = 3;
+    CMD_RESUME       = 4;
+    CMD_SET_PATH     = 5;
+    CMD_CHARGE       = 6;   // operator-initiated: go charge now
+}
+
+message Position {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+message Velocity3 {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+// Fast-changing kinematic data (10 Hz)
+message KinematicState {
+    string   robot_id  = 1;
+    Position position  = 2;
+    Velocity3 velocity = 3;
+    double   heading   = 4;   // radians, atan2(vy, vx)
+    int64    timestamp = 5;
+}
+
+// Slow-changing operational data (1 Hz)
+message OperationalState {
+    string      robot_id      = 1;
+    RobotStatus status        = 2;
+    double      battery_level = 3;
+    int64       timestamp     = 4;
+}
+
+message IntentUpdate {
+    string robot_id = 1;
+    RobotIntent intent_type = 2;
+    Position target_position = 3;
+    repeated Waypoint path_waypoints = 4;
+    int32 path_waypoint_index = 5;
+    int64 timestamp = 6;
+}
+
+message TelemetryUpdate {
+    string robot_id = 1;
+    double cpu_usage = 2;
+    double memory_usage = 3;
+    double temperature = 4;
+    int64 timestamp = 5;
+    int32 tcp_connections = 6;       // number of active TCP sockets in this process
+    int32 active_delivery_loops = 7; // concurrent server-side yield loops (one per subscriber per stream type)
+    double signal_strength = 8;      // link quality 0–100 % (varies with position, degrades near field edges)
+}
+
+// Typed parameters for GOTO command
+message GotoParameters {
+    double x     = 1;
+    double y     = 2;
+    double speed = 3;  // 0 = use default
+}
+
+// Typed parameters for SET_PATH command
+message Waypoint {
+    double x = 1;
+    double y = 2;
+}
+
+message SetPathParameters {
+    repeated Waypoint waypoints = 1;
+}
+
+message CommandRequest {
+    string  robot_id = 1;
+    Command command  = 2;
+    oneof params {
+        GotoParameters      goto_params       = 10;
+        SetPathParameters   set_path_params   = 11;
+    }
+}
+
+message CommandResponse {
+    bool        success       = 1;
+    string      description   = 2;
+    RobotStatus resulting_status = 3;
+    RobotIntent resulting_intent = 4;
+}
+
+message VideoRequest {
+    string robot_id = 1;
+}
+
+message VideoFrame {
+    bytes frame_data = 1;
+    int64 timestamp = 2;
+}
+
+// ── Charging station messages ────────────────────────────────────────────
+
+message SlotRequest {
+    string robot_id      = 1;
+    double battery_level = 2;  // current battery % (helps station prioritise)
+    bool   info_only     = 3;  // true = just return dock coords + queue length, don't allocate a slot
+}
+
+message SlotOffer {
+    string station_id  = 1;
+    string slot_id     = 2;   // unique token for this offer
+    int32  queue_rank  = 3;   // 0 = you're next, 1 = one ahead of you, …
+    int32  wait_time_s = 4;   // estimated seconds until your turn
+    double dock_x      = 5;   // station dock coordinates
+    double dock_y      = 6;
+}
+
+message SlotConfirm {
+    string robot_id = 1;
+    string slot_id  = 2;
+}
+
+message SlotAssignment {
+    bool   granted    = 1;   // true = slot confirmed
+    int32  queue_rank = 2;
+    double wait_x     = 3;   // hold position while waiting (near station)
+    double wait_y     = 4;
+    double dock_x     = 5;   // exact dock coordinates (go here when rank==0)
+    double dock_y     = 6;
+}
+
+message SlotRelease {
+    string robot_id = 1;
+    string slot_id  = 2;
+}
+
+message SlotReleaseAck {
+    bool success = 1;
+}
+
+// ── Charging station status (polled by UI) ──────────────────────────────
+
+message StationStatusRequest {}
+
+message StationStatusResponse {
+    string station_id  = 1;
+    double dock_x      = 2;
+    double dock_y      = 3;
+    string dock_robot  = 4;   // robot_id currently on the dock ("" if free)
+    repeated QueueEntry queue = 5;
+}
+
+message QueueEntry {
+    string robot_id  = 1;
+    int32  rank      = 2;   // 0 = on dock, 1 = next, …
+    bool   confirmed = 3;
+}
+
+// ── Coverage point (on-change, streamed from robot to UI) ───────────────
+// Published when a tractor is actively working a path
+// (INTENT_FOLLOW_PATH + past first waypoint).  Distance-filtered at
+// source (≥1 arena unit between samples).
+// NOTE: gRPC has no built-in late-joiner replay.  A new UI subscriber
+// only sees points generated after the stream opens.  Compare with
+// the DDS approach where DDS TRANSIENT durability replays the full history.
+
+message CoveragePoint {
+    string robot_id        = 1;
+    uint32 sequence_number = 2;
+    double x               = 3;
+    double y               = 4;
+    int64  timestamp       = 5;
+}

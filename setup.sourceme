@@ -1,0 +1,121 @@
+##########
+# Set up the Python environment for the tractor fleet comparison demo.
+#
+# Usage:
+#   source setup.sourceme              # install all dependencies
+#   source setup.sourceme grpc         # install only gRPC approach deps
+#   source setup.sourceme dds          # install only DDS approach deps
+#   source setup.sourceme grpc-dds     # install hybrid approach deps
+#
+# Environment variables you can override:
+#   PYTHON         – Python interpreter (default: python3)
+#   VENV_DIR       – venv directory name (default: venv)
+#   RTI_PYTHON_DIR – RTI Connext Python API wheel directory
+#                    (default: /Applications/rti_connext_dds-7.7.0/resource/python_api)
+
+# Save shell options and restore them on exit so that set -e does not kill
+# an interactive shell when this file is sourced.
+if [[ -n "${ZSH_VERSION-}" ]]; then
+  _saved_opts=$(setopt); _restore_opts() { emulate -LR zsh; eval "$_saved_opts" 2>/dev/null; unset _saved_opts; unfunction _restore_opts 2>/dev/null; }
+else
+  _saved_opts=$(set +o); _restore_opts() { eval "$_saved_opts"; unset _saved_opts; unset -f _restore_opts 2>/dev/null; }
+fi
+trap '_restore_opts' RETURN 2>/dev/null || true
+
+set -euo pipefail
+
+# Find repo root as the directory containing this file (works in bash and zsh)
+if [ -n "${BASH_SOURCE[0]+x}" ]; then
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+  REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+fi
+cd "$REPO_ROOT"
+
+APPROACH="${1:-all}"
+REQS_FILE="$REPO_ROOT/requirements/${APPROACH}.txt"
+
+if [ ! -f "$REQS_FILE" ]; then
+  echo "Unknown approach: $APPROACH"
+  echo "Available:"
+  for f in "$REPO_ROOT"/requirements/*.txt; do
+    echo "  $(basename "$f" .txt)"
+  done
+  return 1 2>/dev/null || exit 1
+fi
+
+PYTHON="${PYTHON:-python3}"
+VENV_DIR="${VENV_DIR:-venv}"
+
+# Require Python >= 3.14.3
+PY_VERSION=$($PYTHON -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")')
+PY_OK=$($PYTHON -c 'import sys; print(1 if sys.version_info >= (3,14,3) else 0)')
+if [ "$PY_OK" -ne 1 ]; then
+  echo "ERROR: Python >= 3.14.3 is required (found $PY_VERSION from '$PYTHON')"
+  echo "  Set PYTHON to a supported interpreter, e.g.:"
+  echo "    PYTHON=python3.14 source setup.sourceme $APPROACH"
+  return 1 2>/dev/null || exit 1
+fi
+
+if [ ! -d "$VENV_DIR" ]; then
+  "$PYTHON" -m venv "$VENV_DIR" --prompt venv
+fi
+
+# shellcheck disable=SC1091
+source "$VENV_DIR/bin/activate"
+
+python -m pip install --upgrade pip setuptools wheel
+
+# macOS: pybullet's bundled zlib redefines fdopen which clashes with
+# the Apple SDK _stdio.h header.  This flag suppresses the TARGET_OS_*
+# macros that trigger the conflict.
+if [[ "$(uname)" == "Darwin" ]]; then
+  export CFLAGS="${CFLAGS:-} -fno-define-target-os-macros"
+fi
+
+# Install dependencies (excluding rti.connext which is not on PyPI)
+{ grep -v 'rti\.connext' "$REQS_FILE" || true; } | { grep -v '^-r ' || true; } > /tmp/_reqs_filtered.txt
+# Resolve -r references manually (one level deep)
+for inc in $({ grep '^-r ' "$REQS_FILE" || true; } | sed 's/^-r //'); do
+  inc_path="$REPO_ROOT/requirements/$inc"
+  { grep -v 'rti\.connext' "$inc_path" || true; } | { grep -v '^-r ' || true; } >> /tmp/_reqs_filtered.txt
+  # Handle nested -r (e.g., grpc-dds -> grpc -> common)
+  for inc2 in $({ grep '^-r ' "$inc_path" || true; } | sed 's/^-r //'); do
+    inc2_path="$REPO_ROOT/requirements/$inc2"
+    { grep -v 'rti\.connext' "$inc2_path" || true; } | { grep -v '^-r ' || true; } >> /tmp/_reqs_filtered.txt
+  done
+done
+sort -u /tmp/_reqs_filtered.txt | python -m pip install -r /dev/stdin
+rm -f /tmp/_reqs_filtered.txt
+
+# RTI Connext Python API – installed from a local directory (not on PyPI).
+if grep -rq 'rti\.connext' "$REQS_FILE" "$REPO_ROOT"/requirements/*.txt 2>/dev/null; then
+  # Check if rti.connext is actually needed for this approach
+  NEEDS_RTI=false
+  if grep -q 'rti\.connext' "$REQS_FILE"; then
+    NEEDS_RTI=true
+  else
+    for inc in $(grep '^-r ' "$REQS_FILE" | sed 's/^-r //'); do
+      if grep -q 'rti\.connext' "$REPO_ROOT/requirements/$inc"; then
+        NEEDS_RTI=true
+        break
+      fi
+    done
+  fi
+
+  if [ "$NEEDS_RTI" = true ]; then
+    RTI_PYTHON_DIR="${RTI_PYTHON_DIR:-/Applications/rti_connext_dds-7.7.0/resource/python_api}"
+    if [ -d "$RTI_PYTHON_DIR" ]; then
+      python -m pip install "rti.connext>=7.6.0" -f "$RTI_PYTHON_DIR"
+    else
+      echo "WARNING: RTI Python API directory not found at $RTI_PYTHON_DIR"
+      echo "  Set RTI_PYTHON_DIR and re-source, or install manually:"
+      echo "    pip install rti.connext -f /path/to/rti/resource/python_api"
+    fi
+  fi
+fi
+
+echo ""
+echo "Environment ready for: $APPROACH"
+echo "  Python: $(which python)"
+echo "  venv:   $REPO_ROOT/$VENV_DIR"

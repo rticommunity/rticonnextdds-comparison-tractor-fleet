@@ -1,0 +1,30 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Generated protobuf files (recreated by run_protoc.sh)
+*_pb2.py
+*_pb2_grpc.py
+
+# Generated DDS types (recreated by rtiddsgen)
+grpc-dds/robot_types.py
+dds/robot_types.py
+
+# RTI Connext license (sensitive -- not for public repos)
+rti_license.dat
+
+# RTI Persistence Service database files (runtime artifacts)
+persistent_data/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Editor temp/lock files
+~$*
+*.swp
+*~

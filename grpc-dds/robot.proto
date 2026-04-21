@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package robot;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hybrid: — DDS Pub-Sub + gRPC Request-Reply
+//
+// gRPC handles ONLY the request-reply patterns:
+//   • RobotCommand  — operator sends commands to individual robots.
+//   • ChargingStation — robots negotiate charging slots with stations.
+//
+// All pub-sub data flows use DDS (see robot_types.xml / robot_types.py):
+//   KinematicState, OperationalState, Intent, Telemetry, VideoFrame,
+//   StationStatus.
+//
+// Compare with the gRPC approach (Full Mesh gRPC):
+//   • the gRPC approach defines RobotStreaming (4 server-streaming RPCs per peer)
+//     and StreamStatus on the station — all replaced by DDS pub-sub here.
+//   • the gRPC approach emulates pub-sub via per-subscriber delivery loops on the
+//     gRPC ThreadPoolExecutor.  DDS does this natively.
+//
+// Compare with the DDS approach (Pure DDS):
+//   • the DDS approach uses rti.rpc SimpleReplier / Requester for commands and
+//     charging — replaced by gRPC unary RPCs here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Command service — operator commands sent from the UI to individual robots.
+// Each robot runs a gRPC server exposing this service.
+// (In the gRPC approach this service also included RequestVideo for streaming
+//  video frames; in the hybrid, video uses DDS pub-sub with partition-based
+//  matching instead.)
+service RobotCommand {
+    rpc SendCommand(CommandRequest) returns (CommandResponse);
+}
+
+// Charging station service — robots negotiate slots via gRPC.
+// Each station runs a gRPC server exposing this service.
+// (In the gRPC approach this service also included StreamStatus for the UI;
+//  in the hybrid, station status uses DDS pub-sub instead.)
+service ChargingStation {
+    rpc RequestSlot(SlotRequest)   returns (SlotOffer);      // non-committing: get estimated wait
+    rpc ConfirmSlot(SlotConfirm)   returns (SlotAssignment);  // reserve the slot
+    rpc ReleaseSlot(SlotRelease)   returns (SlotReleaseAck);         // done charging or cancelled
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum RobotStatus {
+    STATUS_UNKNOWN  = 0;
+    STATUS_MOVING   = 1;
+    STATUS_IDLE     = 2;
+    STATUS_HOLDING  = 3;
+    STATUS_CHARGING = 4;
+}
+
+enum RobotIntent {
+    INTENT_UNKNOWN      = 0;
+    INTENT_FOLLOW_PATH  = 1;
+    INTENT_GOTO         = 2;
+    INTENT_IDLE         = 3;
+    INTENT_CHARGE_QUEUE = 4;
+    INTENT_CHARGE_DOCK  = 5;
+}
+
+enum Command {
+    COMMAND_UNKNOWN  = 0;
+    CMD_STOP         = 1;
+    CMD_FOLLOW_PATH  = 2;
+    CMD_GOTO         = 3;
+    CMD_RESUME       = 4;
+    CMD_SET_PATH     = 5;
+    CMD_CHARGE       = 6;
+}
+
+// ─── Command messages ────────────────────────────────────────────────────────
+
+message GotoParameters {
+    double x     = 1;
+    double y     = 2;
+    double speed = 3;   // 0 = use default
+}
+
+message Waypoint {
+    double x = 1;
+    double y = 2;
+}
+
+message SetPathParameters {
+    repeated Waypoint waypoints = 1;
+}
+
+message CommandRequest {
+    string  robot_id = 1;
+    Command command  = 2;
+    oneof params {
+        GotoParameters    goto_params     = 10;
+        SetPathParameters set_path_params = 11;
+    }
+}
+
+message CommandResponse {
+    bool        success          = 1;
+    string      description      = 2;
+    RobotStatus resulting_status = 3;
+    RobotIntent resulting_intent = 4;
+}
+
+// ─── Charging station messages ───────────────────────────────────────────────
+
+message SlotRequest {
+    string robot_id      = 1;
+    double battery_level = 2;   // current battery %
+    bool   info_only     = 3;   // true = dock coords + queue length only
+}
+
+message SlotOffer {
+    string station_id  = 1;
+    string slot_id     = 2;    // unique token for this offer
+    int32  queue_rank  = 3;    // 0 = you're next
+    int32  wait_time_s = 4;    // estimated seconds until your turn
+    double dock_x      = 5;
+    double dock_y      = 6;
+}
+
+message SlotConfirm {
+    string robot_id = 1;
+    string slot_id  = 2;
+}
+
+message SlotAssignment {
+    bool   granted    = 1;
+    int32  queue_rank = 2;
+    double wait_x     = 3;
+    double wait_y     = 4;
+    double dock_x     = 5;
+    double dock_y     = 6;
+}
+
+message SlotRelease {
+    string robot_id = 1;
+    string slot_id  = 2;
+}
+
+message SlotReleaseAck {
+    bool success = 1;
+}

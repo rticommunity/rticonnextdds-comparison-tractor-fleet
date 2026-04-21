@@ -1,0 +1,18 @@
+# Arena ground quad – single texture stretch over 100x100 arena
+o ArenaGround
+v  50.0 -50.0 0.0
+v  50.0  50.0 0.0
+v -50.0  50.0 0.0
+v -50.0 -50.0 0.0
+
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+vt 0.0 0.0
+
+vn 0.0 0.0 1.0
+
+usemtl Material
+s off
+f 1/1/1 2/2/1 3/3/1
+f 1/1/1 3/3/1 4/4/1

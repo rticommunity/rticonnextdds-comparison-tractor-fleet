@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    robot_types.xml — DDS type definitions for Hybrid (gRPC + DDS)
+
+    Only pub-sub types live here.  Request-reply types (commands,
+    charging slot negotiation) are defined in robot.proto for gRPC.
+
+    NOTE: No 'timestamp' fields.  DDS provides source_timestamp and
+    reception_timestamp in the SampleInfo metadata of every sample —
+    adding an application-level timestamp would be redundant.
+    Use sample.info.source_timestamp on the reader side.
+-->
+<dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.6.0/rti_dds_profiles.xsd">
+
+    <types>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Enums
+             In the hybrid approach (hybrid), Command enum and all request-reply
+             types (CommandRequest/Response, SlotReserve/Assignment,
+             SlotRelease/Ack, GotoParameters, SetPathParameters) are
+             handled by gRPC — see robot.proto.  Only pub-sub enums
+             and types remain here.
+             ═══════════════════════════════════════════════════════════ -->
+
+        <enum name="RobotStatus">
+            <enumerator name="STATUS_UNKNOWN"  value="0"/>
+            <enumerator name="STATUS_MOVING"   value="1"/>
+            <enumerator name="STATUS_IDLE"     value="2"/>  <!-- parked / no movement, no avoidance -->
+            <enumerator name="STATUS_HOLDING"  value="3"/>  <!-- at goal, holding position, avoidance active -->
+            <enumerator name="STATUS_CHARGING" value="4"/>  <!-- docked at a charging station -->
+        </enum>
+
+        <enum name="RobotIntentType">
+            <enumerator name="INTENT_UNKNOWN"      value="0"/>
+            <enumerator name="INTENT_FOLLOW_PATH"  value="1"/>
+            <enumerator name="INTENT_GOTO"         value="2"/>
+            <enumerator name="INTENT_IDLE"         value="3"/>
+            <enumerator name="INTENT_CHARGE_QUEUE" value="4"/>  <!-- queued, waiting for dock -->
+            <enumerator name="INTENT_CHARGE_DOCK"  value="5"/>  <!-- rank 0, navigating to / on dock -->
+        </enum>
+
+        <!-- Command enum is defined in robot.proto (gRPC) — not needed here -->
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Helper structs — reusable building blocks
+             ═══════════════════════════════════════════════════════════ -->
+
+        <struct name="Position">
+            <member name="x" type="double"/>
+            <member name="y" type="double"/>
+            <member name="z" type="double"/>
+        </struct>
+
+        <struct name="Velocity3">
+            <member name="x" type="double"/>
+            <member name="y" type="double"/>
+            <member name="z" type="double"/>
+        </struct>
+
+        <struct name="Waypoint">
+            <member name="x" type="double"/>
+            <member name="y" type="double"/>
+        </struct>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Robot state topics — split by concern & rate
+             ═══════════════════════════════════════════════════════════ -->
+
+        <!-- KinematicState: 10 Hz, BEST_EFFORT / VOLATILE -->
+        <struct name="KinematicState">
+            <member name="robot_id" type="string" stringMaxLength="64" key="true"/>
+            <member name="position" type="nonBasic" nonBasicTypeName="Position"/>
+            <member name="velocity" type="nonBasic" nonBasicTypeName="Velocity3"/>
+            <member name="heading"  type="double"/>   <!-- radians, atan2(vy, vx) -->
+        </struct>
+
+        <!-- OperationalState: on change, RELIABLE / TRANSIENT_LOCAL -->
+        <struct name="OperationalState">
+            <member name="robot_id"      type="string" stringMaxLength="64" key="true"/>
+            <member name="status"        type="nonBasic" nonBasicTypeName="RobotStatus"/>
+            <member name="battery_level" type="double"/>  <!-- 0–100 % -->
+        </struct>
+
+        <!-- Intent: on change, RELIABLE / TRANSIENT_LOCAL -->
+        <struct name="Intent">
+            <member name="robot_id"     type="string" stringMaxLength="64" key="true"/>
+            <member name="intent_type"  type="nonBasic" nonBasicTypeName="RobotIntentType"/>
+            <member name="target_position" type="nonBasic" nonBasicTypeName="Position"/>
+            <member name="path_waypoints" type="nonBasic" nonBasicTypeName="Waypoint"
+                    sequenceMaxLength="64"/>  <!-- ordered waypoint list -->
+            <member name="path_index"   type="int32"/>   <!-- current waypoint index -->
+        </struct>
+
+        <!-- Telemetry: 1 Hz, BEST_EFFORT / VOLATILE
+             No tcp_connections or delivery_loops — those are gRPC artifacts. -->
+        <struct name="Telemetry">
+            <member name="robot_id"        type="string" stringMaxLength="64" key="true"/>
+            <member name="cpu_usage"       type="double"/>  <!-- % -->
+            <member name="memory_usage"    type="double"/>  <!-- % -->
+            <member name="temperature"     type="double"/>  <!-- °C -->
+            <member name="signal_strength" type="double"/>  <!-- link quality 0–100 % -->
+        </struct>
+
+        <!-- VideoFrame: ~5 fps, BEST_EFFORT / VOLATILE -->
+        <struct name="VideoFrame">
+            <member name="robot_id"   type="string" stringMaxLength="64" key="true"/>
+            <member name="frame_data" type="octet" sequenceMaxLength="1000000"/>  <!-- JPEG bytes -->
+        </struct>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Command request-reply and charging slot negotiation are
+             handled entirely by gRPC in the hybrid approach — see robot.proto.
+             The DDS-RPC types (CommandRequest/Response, GotoParameters,
+             SetPathParameters, SlotReserve/Assignment/Release/Ack) that
+             appear in the DDS approach's robot_types.xml are NOT needed here.
+             ═══════════════════════════════════════════════════════════ -->
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Station status — pub-sub topic
+             RELIABLE / TRANSIENT_LOCAL / KEEP_LAST 1
+             ═══════════════════════════════════════════════════════════ -->
+
+        <struct name="QueueEntry">
+            <member name="robot_id"  type="string" stringMaxLength="64"/>
+            <member name="rank"      type="int32"/>    <!-- 0 = on dock, 1 = next, … -->
+            <member name="confirmed" type="boolean"/>  <!-- true = robot has called ConfirmSlot -->
+        </struct>
+
+        <struct name="StationStatus">
+            <member name="station_id"      type="string" stringMaxLength="64" key="true"/>
+            <member name="dock_x"          type="double"/>
+            <member name="dock_y"          type="double"/>
+            <member name="is_occupied"     type="boolean"/>
+            <member name="docked_robot_id" type="string" stringMaxLength="64"/>  <!-- "" if free -->
+            <member name="queue"           type="nonBasic" nonBasicTypeName="QueueEntry"
+                    sequenceMaxLength="16"/>
+        </struct>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             CoveragePoint — on-change, RELIABLE / TRANSIENT
+             Distance-filtered breadcrumb trail per robot.
+             ═══════════════════════════════════════════════════════════ -->
+        <struct name="CoveragePoint">
+            <member name="robot_id"        type="string" stringMaxLength="64" key="true"/>
+            <member name="x"              type="double"/>
+            <member name="y"              type="double"/>
+        </struct>
+
+    </types>
+</dds>

@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    robot_types.xml — DDS type definitions for Pure DDS
+    Mirrors the gRPC approach/robot.proto: same enums, same field semantics.
+    See README §6 (Data Types) for the design rationale.
+
+    NOTE: No 'timestamp' fields.  DDS provides source_timestamp and
+    reception_timestamp in the SampleInfo metadata of every sample —
+    adding an application-level timestamp would be redundant.
+    Use sample.info.source_timestamp on the reader side.
+-->
+<dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.6.0/rti_dds_profiles.xsd">
+
+    <types>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Enums — mirror the gRPC approach protobuf enums exactly
+             ═══════════════════════════════════════════════════════════ -->
+
+        <enum name="RobotStatus">
+            <enumerator name="STATUS_UNKNOWN"  value="0"/>
+            <enumerator name="STATUS_MOVING"   value="1"/>
+            <enumerator name="STATUS_IDLE"     value="2"/>  <!-- parked / no movement, no avoidance -->
+            <enumerator name="STATUS_HOLDING"  value="3"/>  <!-- at goal, holding position, avoidance active -->
+            <enumerator name="STATUS_CHARGING" value="4"/>  <!-- docked at a charging station -->
+        </enum>
+
+        <enum name="RobotIntentType">
+            <enumerator name="INTENT_UNKNOWN"      value="0"/>
+            <enumerator name="INTENT_FOLLOW_PATH"  value="1"/>
+            <enumerator name="INTENT_GOTO"         value="2"/>
+            <enumerator name="INTENT_IDLE"         value="3"/>
+            <enumerator name="INTENT_CHARGE_QUEUE" value="4"/>  <!-- queued, waiting for dock -->
+            <enumerator name="INTENT_CHARGE_DOCK"  value="5"/>  <!-- rank 0, navigating to / on dock -->
+        </enum>
+
+        <enum name="Command">
+            <enumerator name="COMMAND_UNKNOWN"  value="0"/>
+            <enumerator name="CMD_STOP"         value="1"/>
+            <enumerator name="CMD_FOLLOW_PATH"  value="2"/>
+            <enumerator name="CMD_GOTO"         value="3"/>
+            <enumerator name="CMD_RESUME"       value="4"/>
+            <enumerator name="CMD_SET_PATH"     value="5"/>
+            <enumerator name="CMD_CHARGE"       value="6"/>  <!-- operator-initiated: go charge now -->
+        </enum>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Helper structs — reusable building blocks
+             ═══════════════════════════════════════════════════════════ -->
+
+        <struct name="Position">
+            <member name="x" type="double"/>
+            <member name="y" type="double"/>
+            <member name="z" type="double"/>
+        </struct>
+
+        <struct name="Velocity3">
+            <member name="x" type="double"/>
+            <member name="y" type="double"/>
+            <member name="z" type="double"/>
+        </struct>
+
+        <struct name="Waypoint">
+            <member name="x" type="double"/>
+            <member name="y" type="double"/>
+        </struct>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Robot state topics — split by concern & rate
+             ═══════════════════════════════════════════════════════════ -->
+
+        <!-- KinematicState: 10 Hz, BEST_EFFORT / VOLATILE -->
+        <struct name="KinematicState">
+            <member name="robot_id" type="string" stringMaxLength="64" key="true"/>
+            <member name="position" type="nonBasic" nonBasicTypeName="Position"/>
+            <member name="velocity" type="nonBasic" nonBasicTypeName="Velocity3"/>
+            <member name="heading"  type="double"/>   <!-- radians, atan2(vy, vx) -->
+        </struct>
+
+        <!-- OperationalState: on change, RELIABLE / TRANSIENT_LOCAL -->
+        <struct name="OperationalState">
+            <member name="robot_id"      type="string" stringMaxLength="64" key="true"/>
+            <member name="status"        type="nonBasic" nonBasicTypeName="RobotStatus"/>
+            <member name="battery_level" type="double"/>  <!-- 0–100 % -->
+        </struct>
+
+        <!-- Intent: on change, RELIABLE / TRANSIENT_LOCAL -->
+        <struct name="Intent">
+            <member name="robot_id"     type="string" stringMaxLength="64" key="true"/>
+            <member name="intent_type"  type="nonBasic" nonBasicTypeName="RobotIntentType"/>
+            <member name="target_position" type="nonBasic" nonBasicTypeName="Position"/>
+            <member name="path_waypoints" type="nonBasic" nonBasicTypeName="Waypoint"
+                    sequenceMaxLength="64"/>  <!-- ordered waypoint list -->
+            <member name="path_index"   type="int32"/>   <!-- current waypoint index -->
+        </struct>
+
+        <!-- Telemetry: 1 Hz, BEST_EFFORT / VOLATILE
+             No tcp_connections or delivery_loops — those are gRPC artifacts. -->
+        <struct name="Telemetry">
+            <member name="robot_id"        type="string" stringMaxLength="64" key="true"/>
+            <member name="cpu_usage"       type="double"/>  <!-- % -->
+            <member name="memory_usage"    type="double"/>  <!-- % -->
+            <member name="temperature"     type="double"/>  <!-- °C -->
+            <member name="signal_strength" type="double"/>  <!-- link quality 0–100 % -->
+        </struct>
+
+        <!-- VideoFrame: ~5 fps, BEST_EFFORT / VOLATILE -->
+        <struct name="VideoFrame">
+            <member name="robot_id"   type="string" stringMaxLength="64" key="true"/>
+            <member name="frame_data" type="octet" sequenceMaxLength="1000000"/>  <!-- JPEG bytes -->
+        </struct>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Command request-reply — used with rti.rpc.Requester/Replier
+             No request_id field needed: rti.rpc correlates requests and
+             replies automatically via DDS SampleIdentity (writer GUID +
+             sequence number), just as gRPC correlates calls internally.
+             ═══════════════════════════════════════════════════════════ -->
+
+        <!-- GotoParameters — used by CMD_GOTO, CMD_FOLLOW_PATH, CMD_RESUME -->
+        <struct name="GotoParameters">
+            <member name="x"     type="double"/>
+            <member name="y"     type="double"/>
+            <member name="speed" type="double"/>  <!-- 0 = use default -->
+        </struct>
+
+        <!-- SetPathParameters — used by CMD_SET_PATH -->
+        <struct name="SetPathParameters">
+            <member name="waypoints" type="nonBasic" nonBasicTypeName="Waypoint"
+                    sequenceMaxLength="64"/>
+        </struct>
+
+        <struct name="CommandRequest">
+            <member name="robot_id"   type="string" stringMaxLength="64"/>
+            <member name="command"    type="nonBasic" nonBasicTypeName="Command"/>
+            <member name="goto_params" type="nonBasic" nonBasicTypeName="GotoParameters"
+                    optional="true"/>
+            <!-- Set for CMD_GOTO (x, y, speed); also used for
+                 CMD_FOLLOW_PATH / CMD_RESUME when only speed is needed
+                 (x and y default to 0 and are ignored). -->
+            <member name="set_path_params" type="nonBasic" nonBasicTypeName="SetPathParameters"
+                    optional="true"/>
+            <!-- Set for CMD_SET_PATH only. -->
+        </struct>
+
+        <struct name="CommandResponse">
+            <member name="robot_id"         type="string" stringMaxLength="64"/>
+            <member name="success"          type="boolean"/>
+            <member name="description"      type="string" stringMaxLength="256"/>
+            <member name="resulting_status" type="nonBasic" nonBasicTypeName="RobotStatus"/>
+            <member name="resulting_intent" type="nonBasic" nonBasicTypeName="RobotIntentType"/>
+        </struct>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Charging station — slot negotiation request-reply
+             Used with rti.rpc.Requester/Replier — same SampleIdentity
+             correlation as commands above.
+
+             Two RPC pairs (down from three in the original design):
+               SlotReserve → SlotAssignment  (reserve a queue slot)
+               SlotRelease → SlotReleaseAck         (release when done)
+
+             The old SlotRequest/SlotOffer round-trip is eliminated
+             because robots already know every station's queue length
+             and dock position from the StationStatus pub-sub topic.
+             They pick the best station locally and send a single
+             directed SlotReserve.
+             ═══════════════════════════════════════════════════════════ -->
+
+        <struct name="SlotReserve">
+            <member name="robot_id"    type="string" stringMaxLength="64"/>
+            <member name="station_id"  type="string" stringMaxLength="64"/>  <!-- which station to reserve at -->
+            <member name="battery_level" type="double"/>  <!-- current % (informational) -->
+        </struct>
+
+        <struct name="SlotAssignment">
+            <member name="station_id"  type="string" stringMaxLength="64"/>  <!-- who sent this reply -->
+            <member name="slot_id"     type="string" stringMaxLength="64"/>  <!-- unique queue token -->
+            <member name="granted"     type="boolean"/>  <!-- true = slot reserved -->
+            <member name="queue_rank"  type="int32"/>
+            <member name="dock_x"     type="double"/>   <!-- exact dock coordinates -->
+            <member name="dock_y"     type="double"/>
+        </struct>
+
+        <struct name="SlotRelease">
+            <member name="robot_id"   type="string" stringMaxLength="64"/>
+            <member name="slot_id"    type="string" stringMaxLength="64"/>
+            <member name="station_id" type="string" stringMaxLength="64"/>  <!-- target station -->
+        </struct>
+
+        <struct name="SlotReleaseAck">
+            <member name="station_id" type="string" stringMaxLength="64"/>  <!-- who sent this ack -->
+            <member name="slot_id"    type="string" stringMaxLength="64"/>  <!-- which slot -->
+            <member name="success"    type="boolean"/>
+        </struct>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Station status — pub-sub topic
+             RELIABLE / TRANSIENT_LOCAL / KEEP_LAST 1
+             ═══════════════════════════════════════════════════════════ -->
+
+        <struct name="QueueEntry">
+            <member name="robot_id"  type="string" stringMaxLength="64"/>
+            <member name="rank"      type="int32"/>    <!-- 0 = on dock, 1 = next, … -->
+            <member name="confirmed" type="boolean"/>  <!-- true = robot has called ConfirmSlot -->
+        </struct>
+
+        <struct name="StationStatus">
+            <member name="station_id"      type="string" stringMaxLength="64" key="true"/>
+            <member name="dock_x"          type="double"/>
+            <member name="dock_y"          type="double"/>
+            <member name="is_occupied"     type="boolean"/>
+            <member name="docked_robot_id" type="string" stringMaxLength="64"/>  <!-- "" if free -->
+            <member name="queue"           type="nonBasic" nonBasicTypeName="QueueEntry"
+                    sequenceMaxLength="16"/>
+        </struct>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             CoveragePoint — on-change, RELIABLE / TRANSIENT_LOCAL
+             Published by the robot when actively working a path
+             (INTENT_FOLLOW_PATH + past first waypoint).  Distance-
+             filtered at the source (≥1 arena unit between samples).
+             Late-joining UIs receive the full coverage map from the
+             writer's TRANSIENT_LOCAL cache.
+             ═══════════════════════════════════════════════════════════ -->
+
+        <struct name="CoveragePoint">
+            <member name="robot_id"        type="string" stringMaxLength="64" key="true"/>
+            <member name="x"              type="double"/>
+            <member name="y"              type="double"/>
+        </struct>
+
+    </types>
+</dds>

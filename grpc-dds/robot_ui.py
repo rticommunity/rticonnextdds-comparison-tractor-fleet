@@ -988,6 +988,10 @@ function drawMap(state, intent) {
   }
 
   // --- Coverage trail lines (from DDS CoveragePoint topic) ---
+  // Points are distance-filtered at ≥1 arena unit at the source.
+  // If consecutive points are >COV_GAP apart the robot was redirected
+  // — start a new line segment instead of drawing a false connector.
+  const COV_GAP = 5;
   if (showCoverage)
   for (const rid of Object.keys(coverageData)) {
     const trail = coverageData[rid];
@@ -1003,7 +1007,12 @@ function drawMap(state, intent) {
     ctx.moveTo(fx, fy);
     for (let i = 1; i < trail.length; i++) {
       const [px, py] = toPx(trail[i].x, trail[i].y);
-      ctx.lineTo(px, py);
+      const dx = trail[i].x - trail[i-1].x, dy = trail[i].y - trail[i-1].y;
+      if (dx*dx + dy*dy > COV_GAP*COV_GAP) {
+        ctx.stroke(); ctx.beginPath(); ctx.moveTo(px, py);
+      } else {
+        ctx.lineTo(px, py);
+      }
     }
     ctx.stroke();
     ctx.restore();

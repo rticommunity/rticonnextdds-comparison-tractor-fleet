@@ -195,7 +195,7 @@ The UI accumulates these into per-robot polylines drawn on the map canvas
 (lineWidth 4, alpha 0.45, rounded joins).  A toggle button and "Clear Coverage"
 button control display.
 
-### 4.2  Commands (UI → robot)
+### 4.3  Commands (UI → robot)
 
 ```
 Browser  ──POST /command──►  Flask  ──gRPC SendCommand──►  robot_node
@@ -205,7 +205,7 @@ Browser  ──POST /command──►  Flask  ──gRPC SendCommand──►  r
 Unary RPC.  The UI opens a **new** gRPC channel per command, sends
 `SendCommand`, and closes it.
 
-### 4.3  Video (UI → robot → browser)
+### 4.4  Video (UI → robot → browser)
 
 ```
 Browser  ──GET /video_feed/<rid>──►  Flask  ──gRPC RequestVideo──►  robot_node
@@ -216,7 +216,7 @@ The robot renders real-time 3D frames via PyBullet at ~5 fps.  Flask wraps each
 JPEG in a MIME multipart chunk (`multipart/x-mixed-replace`) so the browser
 displays it as a live-updating `<img>`.
 
-### 4.4  Charging (robot ↔ station, UI ← station)
+### 4.5  Charging (robot ↔ station, UI ← station)
 
 ```
 robot_node  ──RequestSlot──►  charging_station   (get estimated wait)
@@ -230,7 +230,7 @@ Robots discover stations via Zeroconf, compare offers from all stations, then
 confirm the best slot.  The UI subscribes to each station's `StreamStatus` for
 the charging panel and map icons.
 
-### 4.5  SSE (Flask → browser)
+### 4.6  SSE (Flask → browser)
 
 ```
 Flask /stream  ──SSE 5 Hz──►  Browser EventSource
@@ -239,7 +239,7 @@ Flask /stream  ──SSE 5 Hz──►  Browser EventSource
 The Flask backend snapshots the `FleetStateStore` every 200 ms and pushes it as
 a JSON SSE event.  The browser JS updates all tables and redraws the canvas map.
 
-### 4.6  Discovery (all participants)
+### 4.7  Discovery (all participants)
 
 ```
                           mDNS multicast (224.0.0.251:5353)
@@ -369,15 +369,15 @@ station (`StreamStatus`), plus Flask's HTTP server.
 
 ## 8  Relationship to Other Approaches
 
-| Aspect | gRPC (this) | Hybrid (grpc-dds/) | DDS pub-sub (dds/) | DDS + RPC (dds/) |
-|--------|--------------------|----------------|----------------|--------------|
-| Topology | Full mesh (N²) | Star (N) | Peer-to-peer multicast | Peer-to-peer multicast |
-| Transport | gRPC / TCP | gRPC / TCP | DDS / UDP multicast | DDS / UDP multicast |
-| Discovery | Zeroconf mDNS (bolted on) | Central server | Automatic (DDS built-in) | Automatic (DDS built-in) |
-| QoS | None (TCP reliable) | None | Per-topic QoS policies | Per-topic QoS policies |
-| Commands | gRPC unary | gRPC unary | gRPC unary | DDS-RPC |
-| Scalability | Poor (N²) | Better (N) | Good (multicast) | Good (multicast) |
-| Presence detection | Seconds (TCP) | Seconds (TCP) | Milliseconds (liveliness) | Milliseconds (liveliness) |
+| Aspect | gRPC (this) | Hybrid (`grpc-dds/`) | DDS (`dds/`) |
+|--------|--------------------|----------------------|------------------|
+| Topology | Full mesh (N²) | Peer-to-peer multicast + gRPC | Peer-to-peer multicast |
+| Transport | gRPC / TCP | DDS / UDP + gRPC / TCP | DDS / UDP multicast |
+| Discovery | Zeroconf mDNS (bolted on) | DDS SPDP + Zeroconf | DDS SPDP only |
+| QoS | None (TCP reliable) | Per-topic (pub-sub only) | Per-topic (everything) |
+| Commands | gRPC unary | gRPC unary | DDS request-reply |
+| Scalability | Poor (N²) | Good (multicast) | Good (multicast) |
+| Presence detection | Seconds (TCP) | Milliseconds (DDS liveliness) | Milliseconds (DDS liveliness) |
 
 This comparison is the central thesis of the webinar: The gRPC approach is the
 simplest to build and reason about, but it hits fundamental scaling and

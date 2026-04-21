@@ -987,7 +987,6 @@ is handled by listener callbacks attached in `_setup_listeners()` — the
 | `robot_types.py` | Auto-generated Python types (`rtiddsgen -language python robot_types.idl`) |
 | `robot_qos.xml` | QoS profiles — Pattern-based (`BuiltinQosLib::Pattern.*`) |
 | `charging_station.py` | Standalone charging station process (future) |
-| `command_console.py` | Interactive CLI for sending commands |
 
 ### External Dependencies
 

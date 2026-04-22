@@ -15,19 +15,40 @@ with running code.
 A fleet of autonomous tractors works a field while coordinating with
 charging stations and a fleet management console:
 
-- **Multiple tractors** (default 5) publishing kinematic state (10 Hz), operational state, intent, telemetry, video, and coverage trail. 
-- **Multiple charging stations** (default 2) managing charge slots via request-reply
-- **Multiple fleet UI** (default 1) visualizing all robots, sending commands, viewing video
+- **Multiple tractors** (default 5) — each tractor is an autonomous process that:
+  - **Produces:** `KinematicState` (position + velocity), `OperationalState`,
+    `Intent`, `Telemetry`, `LiveVideo`, and coverage trail
+  - **Consumes:** `KinematicState`, `OperationalState`, and `Intent` from
+    every other tractor
+  - **Telemetry** includes CPU, memory, motor temperature, and signal
+    strength / link quality (relevant to mixed WiFi/5G/radio connectivity)
+  - Exposes a **command service** interface
+- **Multiple charging stations** (default 2) — each station is an autonomous
+  process that manages charge-slot queuing and reservation via request-reply
+- **Multiple fleet UIs** (default 1) — visualize all tractors, send commands,
+  and view live video
 
-Defaults can be modified editing the `shared/fleet_common.sh` file. 
+Defaults can be modified by editing the `shared/fleet_common.sh` file.
+
+### Data-Flow Requirements
+
+| Data Flow | Send Policy | Reliability | Notes |
+|-----------|------------|-------------|-------|
+| `KinematicState` | Periodic (10 Hz) or on significant change | Best-effort | Consumers must know position within 1 m, velocity within 1 m/s |
+| `OperationalState` | On change | Reliable | Latest state must be known by all |
+| `Intent` | On change | Reliable | Latest intent must be known by all |
+| `Telemetry` | Periodic | Best-effort | Loss of periodic samples is tolerable |
+| `LiveVideo` | Streaming | Best-effort | On-demand from fleet UI |
+| `CoveragePoint` | On move | Reliable | Trail history; persists across restarts (DDS approaches) |
+| Commands | Request-reply | Reliable | Must be delivered |
 
 ### What Makes It Hard
 
-- **Dynamic discovery** — agents come and go at runtime
+- **Dynamic discovery** — agents come and go at runtime; IP addresses change
 - **Late-joiner convergence** — new participants need current state immediately
 - **Presence detection** — know within 100 ms if an agent is alive or dead
 - **Mixed connectivity** — WiFi / 5G / radio with temporary disconnects
-- **Per-flow QoS** — not all data flows are equally critical
+- **Per-flow QoS** — not all data flows are equally critical (see table above)
 - **Scale** — must work for 5 tractors and for 100+
 
 Each approach implements the exact same scenario with the same CLI, so you can

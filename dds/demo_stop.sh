@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Real-Time Innovations, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 # demo_stop.sh — Kill DDS applications.
 # No ports to free — DDS uses multicast, not explicit listen ports.
 #

@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Real-Time Innovations, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 # Generate Python type support for the gRPC approach.
 # Runs protoc to produce robot_pb2.py and robot_pb2_grpc.py from robot.proto.
 #

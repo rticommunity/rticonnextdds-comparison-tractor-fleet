@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Real-Time Innovations, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 # Generate Python type support for the hybrid gRPC+DDS approach.
 # Runs both protoc (for gRPC) and rtiddsgen (for DDS types).
 #

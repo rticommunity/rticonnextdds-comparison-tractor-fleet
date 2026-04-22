@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Real-Time Innovations, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 ##########
 # Set up the Python environment for the tractor fleet comparison demo.
 #

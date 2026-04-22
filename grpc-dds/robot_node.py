@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Real-Time Innovations, Inc.
+# SPDX-License-Identifier: Apache-2.0
 """
 Robot Node — the hybrid approach: Hybrid DDS Pub-Sub + gRPC Request-Reply
 

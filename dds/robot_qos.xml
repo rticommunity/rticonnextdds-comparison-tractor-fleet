@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Real-Time Innovations, Inc. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 <!--
   robot_qos.xml — QoS profiles for the the DDS approach tractor fleet.
 

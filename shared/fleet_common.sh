@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Real-Time Innovations, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 # Common fleet configuration — shared across all approaches.
 # Sourced by each approach's fleet_config.sh.
 #

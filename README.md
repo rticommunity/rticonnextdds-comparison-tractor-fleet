@@ -15,6 +15,8 @@ with running code.
 A fleet of autonomous tractors works a field while coordinating with
 charging stations and a fleet management console:
 
+![Fleet UI showing tractors working the field](shared/tractor_fleet_ui.jpg)
+
 - **Multiple tractors** (default 5) — each tractor is an autonomous process that:
   - **Produces:** `KinematicState` (position + velocity), `OperationalState`,
     `Intent`, `Telemetry`, `LiveVideo`, and coverage trail

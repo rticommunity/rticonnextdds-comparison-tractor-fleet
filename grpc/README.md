@@ -325,15 +325,15 @@ Edit this file to add or remove robots or stations.  All scripts source it.
 ### Launch (Static Mode — No Zeroconf)
 
 ```bash
-# All 5 robots in one terminal (port list passed on CLI):
+# All 5 robots in one terminal:
 ./demo_start.sh all
 
 # Or individual robots in separate terminals:
-./demo_start.sh fred 1       # port 50051
-./demo_start.sh alice 2      # port 50052
-./demo_start.sh bob 3        # port 50053
-./demo_start.sh carol 4      # port 50054
-./demo_start.sh dave 5       # port 50055
+./demo_start.sh robot tractor1    # port 50051
+./demo_start.sh robot tractor2    # port 50052
+./demo_start.sh robot tractor3    # port 50053
+./demo_start.sh robot tractor4    # port 50054
+./demo_start.sh robot tractor5    # port 50055
 
 # Dashboard UI (static):
 ./demo_start.sh ui           # http://localhost:5000

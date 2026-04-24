@@ -158,7 +158,7 @@ Simpler API for transactional request/response patterns.
 
 | Program | Count | Role |
 |---------|-------|------|
-| `robot_node.py` | 1 per tractor (5 in default config: fred, alice, bob, carol, dave) | Autonomous tractor: DDS publishers (6 topics) + DDS readers (4 topics) + gRPC command server + gRPC charging client |
+| `robot_node.py` | 1 per tractor (5 in default config: tractor1, tractor2, tractor3, tractor4, tractor5) | Autonomous tractor: DDS publishers (6 topics) + DDS readers (4 topics) + gRPC command server + gRPC charging client |
 | `charging_station.py` | 1 per station (2 in default config) | Charging dock manager: gRPC server for slot negotiation + DDS StationStatus publisher + Zeroconf registration |
 | `robot_ui.py` | 1 | Fleet dashboard: DDS readers (7 topics) + gRPC command client (Zeroconf-discovered) + Flask web UI |
 | `fleet_discovery.py` | (library) | Zeroconf mDNS helper — registers and discovers gRPC endpoints |

@@ -55,9 +55,9 @@ described in the top-level README:
 
 | Requirement | How the DDS approach handles it |
 |-------------|---------------------------|
-| Late joiners converge quickly | `TRANSIENT_LOCAL` durability on OperationalState and Intent — a new participant receives the last published value for every key immediately on discovery (sub-second, typically < 100 ms). |
-| Presence detection ≤ 100 ms | **Met.** DDS `AUTOMATIC_LIVELINESS_QOS` with a 100 ms lease duration.  The middleware fires a `on_liveliness_changed` callback — zero application code. |
-| Robots appear dynamically | **Met.** DDS Simple Participant Discovery Protocol (SPDP) uses UDP multicast — no configuration, no registry, no mDNS. |
+| Late joiners converge quickly | DDS `TRANSIENT_LOCAL` durability on OperationalState and Intent — a new participant receives the last published value for every key immediately on discovery (sub-second, typically < 100 ms). |
+| Presence detection ≤ 100 ms | DDS `AUTOMATIC_LIVELINESS_QOS` with a 100 ms lease duration.  The middleware fires a `on_liveliness_changed` callback — zero application code. |
+| Robots appear dynamically | DDS Simple Participant Discovery Protocol (SPDP) uses UDP multicast — no configuration, no registry, no mDNS. |
 | KinematicState known within tolerance | `KinematicState` topic published at 10 Hz with `BEST_EFFORT` / `VOLATILE` QoS.  Each robot reads the latest value per key — always fresh, never queued. |
 | OperationalState delivered reliably | `OperationalState` topic with `RELIABLE` / `TRANSIENT_LOCAL` QoS — guaranteed delivery plus late-joiner convergence. Published on change. |
 | Intent delivered reliably | `Intent` topic with `RELIABLE` / `TRANSIENT_LOCAL` QoS.  Includes path waypoints and path index. Published on change. |
@@ -135,7 +135,7 @@ subscriptions**, not TCP connections.
 
 | Program | Count | Role |
 |---------|-------|------|
-| `robot_node.py` | 1 per tractor (5 in default config: fred, alice, bob, carol, dave) | Autonomous tractor: publishes KinematicState / OperationalState / Intent / Telemetry / Video; subscribes to peer state for collision avoidance; handles command requests; negotiates charging slots |
+| `robot_node.py` | 1 per tractor (5 in default config: tractor1, tractor2, tractor3, tractor4, tractor5) | Autonomous tractor: publishes KinematicState / OperationalState / Intent / Telemetry / Video; subscribes to peer state for collision avoidance; handles command requests; negotiates charging slots |
 | `charging_station.py` | 1 per station (2 in default config) | Charging dock manager: FIFO queue, slot negotiation via DDS request-reply, publishes StationStatus |
 | `robot_ui.py` | 1 | Fleet dashboard: subscribes to all robot topics + station status, serves web UI with live map + tables + command panel + video feed + charging panel |
 
@@ -475,14 +475,14 @@ $NDDSHOME/bin/rtiddsgen -language python robot_types.idl
 ./demo_start.sh
 
 # Individual tractor:
-python robot_node.py --id tractor1 --name fred
+python robot_node.py --id tractor1
 
 # Or specific tractors in separate terminals:
-python robot_node.py --id tractor1 --name fred
-python robot_node.py --id tractor2 --name alice
-python robot_node.py --id tractor3 --name bob
-python robot_node.py --id tractor4 --name carol
-python robot_node.py --id tractor5 --name dave
+python robot_node.py --id tractor1
+python robot_node.py --id tractor2
+python robot_node.py --id tractor3
+python robot_node.py --id tractor4
+python robot_node.py --id tractor5
 
 # Charging stations:
 python charging_station.py --id station1 --dock-x 8 --dock-y 92

@@ -248,9 +248,9 @@ orient icons in the direction of travel and smooth rendering between updates.
 
 ## 9  Identity Model
 
-Every message includes a `robot_id` (string).  Robot names are human-readable
-identifiers (e.g. "fred", "robot1") chosen at startup.  They are not UUIDs —
-the demo prioritises readability over global uniqueness.
+Every message includes a `robot_id` (string).  Robot IDs are human-readable
+identifiers (e.g. "tractor1", "tractor2") chosen at startup.  They should be
+unique.
 
 The UI discovers robot names at runtime from the `robot_id` field of incoming
 stream messages.  It does not require a registry or configuration file listing

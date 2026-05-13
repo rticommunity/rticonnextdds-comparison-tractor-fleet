@@ -7,10 +7,6 @@ __pycache__/
 *_pb2.py
 *_pb2_grpc.py
 
-# Generated DDS types (recreated by rtiddsgen from robot_types.idl)
-grpc-dds/robot_types.py
-dds/robot_types.py
-
 # RTI Connext license (sensitive -- not for public repos)
 rti_license.dat
 

@@ -36,7 +36,7 @@ analogous to gRPC unary RPCs, and support fan-out to multiple repliers.
 | Layer | Technology |
 |-------|-----------|
 | Language | Python 3.14.3+ |
-| Middleware | RTI Connext DDS 7.6.0+ (`rti.connextdds`, `rti.idl`, `rti.rpc`) |
+| Middleware | RTI Connext DDS 7.7.0+ (`rti.connextdds`, `rti.idl`, `rti.rpc`) |
 | Type generation | `rtiddsgen -language python robot_types.idl` → `robot_types.py` |
 | QoS configuration | `robot_qos.xml` — Pattern-based profiles (`BuiltinQosLib::Pattern.*`) |
 | Concurrency | Python `threading` (daemon threads, `threading.Lock`) |

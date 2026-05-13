@@ -61,7 +61,7 @@ compare them directly.
 ### Prerequisites
 
 - Python 3.14.3+
-- RTI Connext DDS 7.6+ ([install Connext DDS](https://community.rti.com/static/documentation/developers/get-started/)) (for `grpc-dds/` and `dds/` approaches)
+- RTI Connext DDS 7.7+ ([install Connext DDS](https://community.rti.com/static/documentation/developers/get-started/)) (for `grpc-dds/` and `dds/` approaches)
 
 ### Setup
 

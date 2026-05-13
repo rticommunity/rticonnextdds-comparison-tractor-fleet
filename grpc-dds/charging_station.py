@@ -297,7 +297,11 @@ def main():
     qos_xml = os.path.join(script_dir, "robot_qos.xml")
     qos_provider = dds.QosProvider(qos_xml)
 
-    participant = dds.DomainParticipant(args.domain)
+    participant_qos = qos_provider.participant_qos_from_profile(
+        "RobotQosLibrary::ParticipantProfile")
+    participant_qos.participant_name.name = args.station_id
+    participant_qos.participant_name.role_name = "ChargingStation"
+    participant = dds.DomainParticipant(args.domain, participant_qos)
     station_topic = dds.Topic(participant, "StationStatus", StationStatus)
     publisher = dds.Publisher(participant)
     status_w_qos = qos_provider.datawriter_qos_from_profile(

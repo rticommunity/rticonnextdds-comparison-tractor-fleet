@@ -185,7 +185,11 @@ class DdsFleetClient:
         qos_xml = os.path.join(script_dir, "robot_qos.xml")
         qos_provider = dds.QosProvider(qos_xml)
 
-        self.participant = dds.DomainParticipant(self.domain_id)
+        participant_qos = qos_provider.participant_qos_from_profile(
+            "RobotQosLibrary::ParticipantProfile")
+        participant_qos.participant_name.name = "FleetUI"
+        participant_qos.participant_name.role_name = "FleetUI"
+        self.participant = dds.DomainParticipant(self.domain_id, participant_qos)
 
         # ── Topics ────────────────────────────────────────────────────────
         kin_topic     = dds.Topic(self.participant, "KinematicState",   KinematicState)

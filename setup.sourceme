@@ -13,9 +13,8 @@
 # Environment variables you can override:
 #   PYTHON         – Python interpreter (default: python3)
 #   VENV_DIR       – venv directory name (default: venv)
-#   NDDSHOME       – RTI Connext DDS installation directory (auto-detected if not set)
-#   RTI_PYTHON_DIR – RTI Connext Python API wheel directory
-#                    (default: $NDDSHOME/resource/python_api)
+#   NDDSHOME       – RTI Connext DDS installation directory
+#                    (auto-detected in /Applications, /opt, or $HOME)
 
 # This file is sourced, not executed. Never use set -e/-u/-o pipefail at the
 # top level — those options propagate to the interactive shell and cause it to
@@ -44,20 +43,23 @@ fi
 PYTHON="${PYTHON:-python3}"
 VENV_DIR="${VENV_DIR:-venv}"
 
-# ── Locate RTI Connext DDS installation ──────────────────────────────────
-# Auto-detect NDDSHOME if not set. Exported so demo_start.sh scripts inherit it.
+# ── Connext installation path ───────────────────────────────────────────────
+# Auto-detect NDDSHOME if not set.
 if [ -z "${NDDSHOME:-}" ]; then
-  # Use find to avoid zsh glob errors when a directory pattern has no matches
-  while IFS= read -r d; do
-    [ -d "$d/bin" ] && NDDSHOME="$d"   # picks the last (newest) match
-  done < <(find /Applications /opt "$HOME" -maxdepth 1 -name 'rti_connext_dds-*' -type d 2>/dev/null | sort)
-  if [ -n "${NDDSHOME:-}" ]; then
-    echo "NOTE: NDDSHOME was not set — auto-detected $NDDSHOME"
-  fi
+  for _d in /Applications /opt "$HOME"; do
+    [ -d "$_d/rti_connext_dds-7.7.0" ] && NDDSHOME="$_d/rti_connext_dds-7.7.0" && break
+  done
+  unset _d
 fi
-if [ -n "${NDDSHOME:-}" ]; then
-  export NDDSHOME
+
+if [ -z "${NDDSHOME:-}" ] || [[ ! -d "$NDDSHOME" ]]; then
+    echo "ERROR: RTI Connext DDS 7.7.0 not found."
+    echo "       Set NDDSHOME to your installation directory, e.g.:"
+    echo "         export NDDSHOME=/opt/rti_connext_dds-7.7.0"
+    return 1 2>/dev/null || exit 1
 fi
+export NDDSHOME
+export RTI_MONITORING2_ENABLE=TRUE
 # ─────────────────────────────────────────────────────────────────────────
 
 # Require Python >= 3.14.3
@@ -86,47 +88,8 @@ if [[ "$(uname)" == "Darwin" ]]; then
   export CFLAGS="${CFLAGS:-} -fno-define-target-os-macros"
 fi
 
-# Install dependencies (excluding rti.connext which is not on PyPI)
-{ grep -v 'rti\.connext' "$REQS_FILE" || true; } | { grep -v '^-r ' || true; } > /tmp/_reqs_filtered.txt
-# Resolve -r references manually (one level deep)
-for inc in $({ grep '^-r ' "$REQS_FILE" || true; } | sed 's/^-r //'); do
-  inc_path="$REPO_ROOT/requirements/$inc"
-  { grep -v 'rti\.connext' "$inc_path" || true; } | { grep -v '^-r ' || true; } >> /tmp/_reqs_filtered.txt
-  # Handle nested -r (e.g., grpc-dds -> grpc -> common)
-  for inc2 in $({ grep '^-r ' "$inc_path" || true; } | sed 's/^-r //'); do
-    inc2_path="$REPO_ROOT/requirements/$inc2"
-    { grep -v 'rti\.connext' "$inc2_path" || true; } | { grep -v '^-r ' || true; } >> /tmp/_reqs_filtered.txt
-  done
-done
-sort -u /tmp/_reqs_filtered.txt | python -m pip install -r /dev/stdin
-rm -f /tmp/_reqs_filtered.txt
-
-# RTI Connext Python API – installed from a local directory (not on PyPI).
-if grep -rq 'rti\.connext' "$REQS_FILE" "$REPO_ROOT"/requirements/*.txt 2>/dev/null; then
-  # Check if rti.connext is actually needed for this approach
-  NEEDS_RTI=false
-  if grep -q 'rti\.connext' "$REQS_FILE"; then
-    NEEDS_RTI=true
-  else
-    for inc in $(grep '^-r ' "$REQS_FILE" | sed 's/^-r //'); do
-      if grep -q 'rti\.connext' "$REPO_ROOT/requirements/$inc"; then
-        NEEDS_RTI=true
-        break
-      fi
-    done
-  fi
-
-  if [ "$NEEDS_RTI" = true ]; then
-    RTI_PYTHON_DIR="${RTI_PYTHON_DIR:-${NDDSHOME:-}/resource/python_api}"
-    if [ -d "$RTI_PYTHON_DIR" ]; then
-      python -m pip install "rti.connext>=7.6.0" -f "$RTI_PYTHON_DIR"
-    else
-      echo "WARNING: RTI Python API directory not found at $RTI_PYTHON_DIR"
-      echo "  Ensure NDDSHOME is set or set RTI_PYTHON_DIR manually:"
-      echo "    RTI_PYTHON_DIR=/path/to/rti/resource/python_api source setup.sourceme $APPROACH"
-    fi
-  fi
-fi
+# Install dependencies (rti.connext is available on PyPI)
+python -m pip install -r "$REQS_FILE"
 
 echo ""
 echo "Environment ready for: $APPROACH"

@@ -124,7 +124,11 @@ class ChargingStation:
         qos_xml = os.path.join(script_dir, "robot_qos.xml")
         qos_provider = dds.QosProvider(qos_xml)
 
-        self.participant = dds.DomainParticipant(self.domain_id)
+        participant_qos = qos_provider.participant_qos_from_profile(
+            "RobotQosLibrary::ParticipantProfile")
+        participant_qos.participant_name.name = self.station_id
+        participant_qos.participant_name.role_name = "ChargingStation"
+        self.participant = dds.DomainParticipant(self.domain_id, participant_qos)
 
         # ── Pub-Sub: StationStatus topic ──────────────────────────────────
         status_topic = dds.Topic(self.participant, "StationStatus", StationStatus)

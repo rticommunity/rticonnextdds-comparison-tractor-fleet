@@ -70,7 +70,7 @@ described in the top-level README:
 
 ### Known Limitations (honest trade-offs)
 
-- **Runtime dependency** — requires RTI Connext DDS 7.6.0+ installed and licensed. 
+- **Runtime dependency** — requires RTI Connext DDS 7.7.0+ installed and licensed. 
 - **Learning curve** — QoS policy combinations are powerful but have a higher learning curve. Mismatched QoS can cause applications to not communicate. gRPC is simpler as it effectively has just one QoS (TCP semantics).
 - **Web deployment friction** — Less friendly to web stacks harder to deploy with load balances, no web proxying
 
@@ -449,7 +449,7 @@ header.
 ### Prerequisites
 
 - Python 3.14.3+
-- RTI Connext DDS 7.6.0+ (Professional or Community edition)
+- RTI Connext DDS 7.7.0+ (Professional or Community edition)
 - RTI Code Generator (`rtiddsgen`) — included in the Connext installation
 - Virtual environment with packages: `rti.connext`, `flask`, `pybullet`,
   `Pillow`, `numpy`
@@ -459,7 +459,7 @@ header.
 ```bash
 source ../setup.sourceme dds
 # or manually:
-export NDDSHOME=/path/to/rti_connext_dds-7.6.0
+export NDDSHOME=/path/to/rti_connext_dds-7.7.0
 export PATH=$NDDSHOME/bin:$PATH
 export LD_LIBRARY_PATH=$NDDSHOME/lib/x64Darwin17clang9.0:$LD_LIBRARY_PATH  # macOS
 pip install -r requirements.txt
@@ -677,4 +677,4 @@ that topics, types, services, and QoS are matching correctly.
 - [DDS Specification (OMG)](https://www.omg.org/spec/DDS/)
 - [QoS Best Practices](https://community.rti.com/best-practices/qos-configuration)
 - [DDS-RPC Specification](https://www.omg.org/spec/DDS-RPC/)
-- [RTI Connext Python API](https://community.rti.com/static/documentation/connext-dds/7.6.0/doc/api/connext_dds/api_python/index.html)
+- [RTI Connext Python API](https://community.rti.com/static/documentation/connext-dds/7.7.0/doc/api/connext_dds/api_python/index.html)

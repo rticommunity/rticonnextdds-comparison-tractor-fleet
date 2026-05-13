@@ -80,7 +80,7 @@ This approach uses each technology where it excels:
 
 ### Known Limitations (honest trade-offs)
 
-- **Dual runtime** — requires both RTI Connext DDS 7.6.0+ and gRPC.  More
+- **Dual runtime** — requires both RTI Connext DDS 7.7.0+ and gRPC.  More
   dependencies than either pure approach.
 - **Dual discovery** — DDS SPDP handles pub-sub, but gRPC endpoints still need
   Zeroconf mDNS.  Two discovery stacks to configure and troubleshoot.
@@ -453,7 +453,7 @@ Defined in `robot_types.idl` — single source of truth for all pub-sub types.
 ### Prerequisites
 
 - Python 3.14.3+
-- RTI Connext DDS 7.6.0+ (Professional or Community edition)
+- RTI Connext DDS 7.7.0+ (Professional or Community edition)
 - RTI Code Generator (`rtiddsgen`) — included in the Connext installation
 - Virtual environment with packages: `rti.connext`, `grpcio`, `grpcio-tools`,
   `protobuf`, `flask`, `pybullet`, `Pillow`, `numpy`, `zeroconf`, `ifaddr`
@@ -463,7 +463,7 @@ Defined in `robot_types.idl` — single source of truth for all pub-sub types.
 ```bash
 source ../setup.sourceme grpc-dds
 # or manually:
-export NDDSHOME=/path/to/rti_connext_dds-7.6.0
+export NDDSHOME=/path/to/rti_connext_dds-7.7.0
 export PATH=$NDDSHOME/bin:$PATH
 pip install -r requirements.txt
 ```

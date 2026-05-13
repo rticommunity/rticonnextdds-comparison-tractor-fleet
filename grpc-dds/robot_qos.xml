@@ -20,13 +20,26 @@
     Pattern.LastValueCache  — RELIABLE, TRANSIENT_LOCAL, KEEP_LAST 1
     Pattern.RPC             — RELIABLE, KEEP_ALL, tuned heartbeat/NACK
 
-  Note: In 7.6.0 the Pattern profiles live in BuiltinQosLib (no longer
+  Note: In 7.7.0 the Pattern profiles live in BuiltinQosLib (no longer
   experimental).  BuiltinQosLibExp is a deprecated compatibility alias.
 -->
 <dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.6.0/rti_dds_profiles.xsd">
+     xsi:noNamespaceSchemaLocation="https://community.rti.com/schema/7.7.0/rti_dds_profiles.xsd">
 
     <qos_library name="RobotQosLibrary">
+
+        <!-- ============================================================
+             ParticipantProfile — disable shared memory transport.
+             Only UDPv4 is enabled so all communication goes over the
+             network stack (useful for multi-host demos and debugging).
+             ============================================================ -->
+        <qos_profile name="ParticipantProfile">
+            <domain_participant_qos>
+                <transport_builtin>
+                    <mask>UDPv4</mask>
+                </transport_builtin>
+            </domain_participant_qos>
+        </qos_profile>
 
         <!-- ============================================================
              KinematicState  (10 Hz, BEST_EFFORT, VOLATILE)

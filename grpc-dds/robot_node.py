@@ -900,6 +900,7 @@ class RobotNode:
     AVOIDANCE_RADIUS = 12.0
     AVOIDANCE_STRENGTH = 4.0
     MIN_SEPARATION = 4.0
+    MAX_TURN_RATE = 2.0          # rad/s — non-holonomic steering limit
 
     @property
     def _is_docking(self) -> bool:
@@ -971,6 +972,29 @@ class RobotNode:
 
         return ax, ay, hard_override
 
+    def _steer_heading(self, desired_vx, desired_vy, dt):
+        """Turn self.heading toward the desired velocity, clamped by MAX_TURN_RATE.
+
+        Returns (vx, vy) along the updated heading.  Speed is reduced
+        when the heading error is large so the tractor decelerates into
+        sharp turns.
+        """
+        desired_speed = math.sqrt(desired_vx**2 + desired_vy**2)
+        if desired_speed < 0.01:
+            return 0.0, 0.0
+
+        desired_heading = math.atan2(desired_vy, desired_vx)
+        diff = (desired_heading - self.heading + math.pi) % (2 * math.pi) - math.pi
+        max_turn = self.MAX_TURN_RATE * dt
+        self.heading += max(-max_turn, min(max_turn, diff))
+        self.heading = (self.heading + math.pi) % (2 * math.pi) - math.pi
+
+        # Slow down when turning hard — tractors decelerate into sharp turns
+        turn_factor = max(0.2, math.cos(min(abs(diff), math.pi / 2)))
+        speed = desired_speed * turn_factor
+
+        return math.cos(self.heading) * speed, math.sin(self.heading) * speed
+
     # ═════════════════════════════════════════════════════════════════════
     # Position update (movement tick)
     # ═════════════════════════════════════════════════════════════════════
@@ -1041,17 +1065,15 @@ class RobotNode:
                 if self.status == RobotStatus.STATUS_MOVING:
                     avoid_x, avoid_y, hard_override = self._compute_avoidance()
                     if hard_override:
-                        vx, vy = avoid_x, avoid_y
+                        dvx, dvy = avoid_x, avoid_y
                     else:
-                        vx += avoid_x
-                        vy += avoid_y
+                        dvx, dvy = vx + avoid_x, vy + avoid_y
 
+                    vx, vy = self._steer_heading(dvx, dvy, dt)
                     self.position["x"] += vx * dt
                     self.position["y"] += vy * dt
                     self.velocity_x = vx
                     self.velocity_y = vy
-                    if abs(vx) + abs(vy) > 0.01:
-                        self.heading = math.atan2(vy, vx)
 
                     # ── Coverage point (active path work only) ────────
                     if self.intent == RobotIntentType.INTENT_FOLLOW_PATH:
@@ -1079,17 +1101,15 @@ class RobotNode:
 
                 avoid_x, avoid_y, hard_override = self._compute_avoidance()
                 if hard_override:
-                    vx, vy = avoid_x, avoid_y
+                    dvx, dvy = avoid_x, avoid_y
                 else:
-                    vx += avoid_x
-                    vy += avoid_y
+                    dvx, dvy = vx + avoid_x, vy + avoid_y
 
+                vx, vy = self._steer_heading(dvx, dvy, dt)
                 self.position["x"] += vx * dt
                 self.position["y"] += vy * dt
                 self.velocity_x = vx
                 self.velocity_y = vy
-                if abs(vx) + abs(vy) > 0.01:
-                    self.heading = math.atan2(vy, vx)
 
             elif self.status == RobotStatus.STATUS_CHARGING:
                 self.velocity_x = 0.0
